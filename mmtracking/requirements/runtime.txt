@@ -1,0 +1,10 @@
+dotty_dict
+matplotlib
+mmcls==0.14.0
+mmpycocotools
+motmetrics
+numpy
+seaborn
+six
+terminaltables
+tqdm
