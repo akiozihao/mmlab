@@ -1,7 +1,21 @@
+import numpy as np
 from mmcv.ops import ModulatedDeformConv2dPack
+from mmdet.models.builder import NECKS
 from torch import nn
-
+import math
 BN_MOMENTUM = 0.1
+
+
+def fill_up_weights(up):
+    w = up.weight.data
+    f = math.ceil(w.size(2) / 2)
+    c = (2 * f - 1 - f % 2) / (2. * f)
+    for i in range(w.size(2)):
+        for j in range(w.size(3)):
+            w[0, 0, i, j] = \
+                (1 - math.fabs(i / f - c)) * (1 - math.fabs(j / f - c))
+    for c in range(1, w.size(0)):
+        w[c, 0, :, :] = w[0, 0, :, :]
 
 
 class DeformConv(nn.Module):
@@ -83,6 +97,11 @@ class DLAUp(nn.Module):
         return out
 
 
+DLA_NODE = {
+    'dcn': (DeformConv, DeformConv),
+}
+
+
 @NECKS.register_module()
 class DLANeck(nn.Module):
     arch_settings = {
@@ -91,6 +110,7 @@ class DLANeck(nn.Module):
 
     def __init__(self, arch):
         super(DLANeck, self).__init__()
+        self.node_type = DLA_NODE['dcn']
         assert arch == 34, 'Only support dla-34.'
         channels = self.arch_settings[arch][0]
         down_ratio = self.arch_settings[arch][1]
@@ -100,12 +120,13 @@ class DLANeck(nn.Module):
         self.dla_up = DLAUp(
             self.first_level,
             channels[self.first_level:],
-            scales)
+            scales, node_type=self.node_type)
         out_channel = channels[self.first_level]
 
         self.ida_up = IDAUp(
             out_channel, channels[self.first_level:self.last_level],
             [2 ** i for i in range(self.last_level - self.first_level)],
+            node_type=self.node_type
         )
 
     def forward(self, x):
