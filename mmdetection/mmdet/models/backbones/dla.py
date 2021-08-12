@@ -1,6 +1,8 @@
 import torch
-from torch import nn
 from mmdet.models.builder import BACKBONES
+from torch import nn
+
+BN_MOMENTUM = 0.1
 
 
 class BasicBlock(nn.Module):
@@ -110,6 +112,7 @@ class Tree(nn.Module):
             x = self.tree2(x1, children=children)
         return x
 
+
 @BACKBONES.register_module()
 class DLA(nn.Module):
     def __init__(self, levels, channels, num_classes=1000,
@@ -211,6 +214,7 @@ class DLA(nn.Module):
             kernel_size=1, stride=1, padding=0, bias=True)
         self.load_state_dict(model_weights, strict=False)
         # self.fc = fc
+
 
 def dla34(pretrained=True, **kwargs):  # DLA-34
     model = DLA([1, 1, 1, 2, 2, 1],

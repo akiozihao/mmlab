@@ -1,6 +1,8 @@
 from mmcv.ops import ModulatedDeformConv2dPack
 from torch import nn
 
+BN_MOMENTUM = 0.1
+
 
 class DeformConv(nn.Module):
     def __init__(self, chi, cho):
