@@ -139,13 +139,13 @@ class DLA(nn.Module):
                            level_root=True, root_residual=residual_root)
         self.level5 = Tree(levels[5], block, channels[4], channels[5], 2,
                            level_root=True, root_residual=residual_root)
-        if opt.pre_img:
+        if True:
             self.pre_img_layer = nn.Sequential(
                 nn.Conv2d(3, channels[0], kernel_size=7, stride=1,
                           padding=3, bias=False),
                 nn.BatchNorm2d(channels[0], momentum=BN_MOMENTUM),
                 nn.ReLU(inplace=True))
-        if opt.pre_hm:
+        if True:
             self.pre_hm_layer = nn.Sequential(
                 nn.Conv2d(1, channels[0], kernel_size=7, stride=1,
                           padding=3, bias=False),
