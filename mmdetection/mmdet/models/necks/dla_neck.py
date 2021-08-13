@@ -1,5 +1,5 @@
 import numpy as np
-# from mmcv.ops import ModulatedDeformConv2dPack
+from mmcv.ops import ModulatedDeformConv2dPack
 from mmdet.models.builder import NECKS
 from torch import nn
 import math
@@ -31,6 +31,30 @@ class DeformConv(nn.Module):
         x = self.conv(x)
         x = self.actf(x)
         return x
+
+# class DeformConv(nn.Module):
+#     def __init__(self, chi, cho):
+#         super(DeformConv, self).__init__()
+#         self.actf = nn.Sequential(
+#             nn.BatchNorm2d(cho, momentum=BN_MOMENTUM),
+#             nn.ReLU(inplace=True)
+#         )
+#         self.conv = ModulatedDeformConv2dPack(
+#             in_channels=chi,
+#             out_channels=cho,
+#             kernel_size=(3, 3),
+#             stride=1,
+#             padding=1,
+#             dilation=1,
+#             groups=1,
+#             deform_groups=1,
+#             bias=True)
+#
+#     def forward(self, x):
+#         x = self.conv(x)
+#         x = self.actf(x)
+#         return x
+
 
 class IDAUp(nn.Module):
     def __init__(self, o, channels, up_f, node_type=(DeformConv, DeformConv)):
