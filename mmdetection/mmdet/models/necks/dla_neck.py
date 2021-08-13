@@ -151,4 +151,4 @@ class DLANeck(nn.Module):
             y.append(x[i].clone())
         self.ida_up(y, 0, len(y))
 
-        return y[-1]
+        return [y[-1]]
