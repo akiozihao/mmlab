@@ -1,10 +1,10 @@
 import numpy as np
-from mmcv.ops import ModulatedDeformConv2dPack
+# from mmcv.ops import ModulatedDeformConv2dPack
 from mmdet.models.builder import NECKS
 from torch import nn
 import math
 BN_MOMENTUM = 0.1
-
+from CenterTrack.src.lib.model.networks.DCNv2.dcn_v2 import DCN
 
 def fill_up_weights(up):
     w = up.weight.data
@@ -25,22 +25,12 @@ class DeformConv(nn.Module):
             nn.BatchNorm2d(cho, momentum=BN_MOMENTUM),
             nn.ReLU(inplace=True)
         )
-        self.conv = ModulatedDeformConv2dPack(
-            in_channels=chi,
-            out_channels=cho,
-            kernel_size=(3, 3),
-            stride=1,
-            padding=1,
-            dilation=1,
-            groups=1,
-            deform_groups=1,
-            bias=True)
+        self.conv = DCN(chi, cho, kernel_size=(3,3), stride=1, padding=1, dilation=1, deformable_groups=1)
 
     def forward(self, x):
         x = self.conv(x)
         x = self.actf(x)
         return x
-
 
 class IDAUp(nn.Module):
     def __init__(self, o, channels, up_f, node_type=(DeformConv, DeformConv)):
