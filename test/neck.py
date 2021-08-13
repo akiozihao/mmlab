@@ -1,43 +1,72 @@
 import torch
 from mmdet.models.backbones.dla import DLA
 from mmdet.models.necks.dla_neck import DLANeck
+
 from CenterTrack.src.lib.model.networks.dla import BasicBlock, DLA as DLA_Ori
 from CenterTrack.src.lib.model.networks.dla import DLASeg
 from utils import Struct
 
+torch.backends.cudnn.benchmark = True
+backbone_path = '/home/akio/Downloads/crowdhuman_split/backbone.pt'
+neck_path = '/home/akio/Downloads/crowdhuman_split/neck.pt'
+opt_path = '/home/akio/Downloads/crowdhuman_split/opt.pt'
 
-# neck_pth = '/home/akio/Downloads/crowdhuman_split/neck.pt'
-# opt_path = '/home/akio/Downloads/crowdhuman_split/opt.pt'
-neck_pth = '../tensors/neck.pt'
-opt_path = '../tensors/opt.pt'
-
+# opt = Struct(**{'pre_img': True,
+#                 'pre_hm': True,
+#                 'head_kernel': 3,
+#                 'prior_bias': -4.6,
+#                 'dla_node': 'dcn',
+#                 'load_model': ''}
+#              )
 opt = torch.load(opt_path)
-print(Struct.to_dict(opt))
 
-neck = DLANeck(34).cuda()
+neck = DLANeck(34)
 heads = {'hm': 1, 'reg': 2, 'wh': 2, 'tracking': 2, 'ltrb_amodal': 4}
 head_convs = {'hm': [256], 'reg': [256], 'wh': [256], 'tracking': [256], 'ltrb_amodal': [256]}
 neck_ori = DLASeg(34, heads, head_convs, opt=opt)
 
-x = torch.randn(1, 3, 544, 960).cuda()
-pre_img = torch.randn(1, 3, 544, 960).cuda()
-pre_hm = torch.randn(1, 1, 544, 960).cuda()
+x = torch.randn(1, 3, 544, 960)
+pre_img = torch.randn(1, 3, 544, 960)
+pre_hm = torch.randn(1, 1, 544, 960)
 
 backbone = DLA(levels=[1, 1, 1, 2, 2, 1],
-               channels=[16, 32, 64, 128, 256, 512]).cuda()
+               channels=[16, 32, 64, 128, 256, 512])
 backbone_ori = DLA_Ori([1, 1, 1, 2, 2, 1],
                        [16, 32, 64, 128, 256, 512],
-                       block=BasicBlock)
+                       block=BasicBlock, opt=opt)
+
+
+backbone_st = torch.load(backbone_path)
+backbone.load_state_dict(backbone_st)
+backbone_ori.load_state_dict(backbone_st)
+
 backbone_out = backbone(x, pre_img, pre_hm)
 backbone_out_ori = backbone_ori(x, pre_img, pre_hm)
 
+assert all([(v1 == v2).all() for v1, v2 in zip(backbone_out, backbone_out_ori)]), 'backbone != backbone_ori'
 
-neck_out = neck(backbone_out)  # tensor
-x = neck_ori.dla_up(backbone_out_ori)
+neck_st_ori = torch.load(neck_path)
+neck_st = dict()
+for k, v in neck_st_ori.items():
+    nk = k.replace('conv_offset_mask', 'conv_offset')
+    neck_st[nk] = v.clone()
+# neck.load_state_dict(neck_st)
+neck.load_state_dict(neck_st_ori)
+neck_ori.load_state_dict(neck_st_ori, strict=False)
+
+dla_up_out = neck.dla_up(backbone_out)
+dla_up_out_ori = neck_ori.dla_up(backbone_out_ori)
+
 y = []
+y_ori = []
 for i in range(neck_ori.last_level - neck_ori.first_level):
-    y.append(x[i].clone())
-neck_ori.ida_up(y, 0, len(y))
-neck_out_ori = [y[-1]]
-print('neck_out.shape',neck_out.shape)
+    y_ori.append(dla_up_out_ori[i].clone())
+    y.append(dla_up_out[i].clone())
+
+neck_ori.ida_up(y_ori, 0, len(y_ori))
+neck.ida_up(y, 0, len(y))
+neck_out_ori = y_ori[-1]
+neck_out = y[-1]
+assert (neck_out == neck_out_ori).all(), 'neck_out != neck_out_ori'
+
 print('done')
