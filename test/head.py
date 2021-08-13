@@ -22,8 +22,6 @@ head_path = '/home/akio/Downloads/crowdhuman_split/head.pt'
 #              )
 opt = torch.load(opt_path)
 
-heads = {'hm': 1, 'reg': 2, 'wh': 2, 'tracking': 2, 'ltrb_amodal': 4}
-head_convs = {'hm': [256], 'reg': [256], 'wh': [256], 'tracking': [256], 'ltrb_amodal': [256]}
 # input
 x = torch.randn(1, 3, 544, 960)
 pre_img = torch.randn(1, 3, 544, 960)
