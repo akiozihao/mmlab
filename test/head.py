@@ -52,7 +52,7 @@ heads = {
 }
 
 head = CenterTrackHead(
-    heads, head_convs, 1, 64
+    heads, head_convs, 1, 64,opt=opt
 )
 # init origin model
 seg = DLASeg(34, heads, head_convs, opt=opt)
@@ -109,5 +109,5 @@ for head in seg.heads:
     head_output_ori[head] = seg.__getattr__(head)(neck_out_ori)
 head_output_ori = [head_output_ori]
 for head in seg.heads:
-    assert (head_output[0][head][0]==head_output_ori[0][head]).all(),f'{head} not match'
+    assert (head_output[0][head]==head_output_ori[0][head]).all(),f'{head} not match'
 print('done')
