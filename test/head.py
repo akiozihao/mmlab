@@ -12,7 +12,7 @@ use_cuda = True
 backbone_path = '/home/akio/Downloads/crowdhuman_split/backbone.pt'
 neck_path = '/home/akio/Downloads/crowdhuman_split/neck.pt'
 opt_path = '/home/akio/Downloads/crowdhuman_split/opt.pt'
-
+head_path = '/home/akio/Downloads/crowdhuman_split/head.pt'
 # opt = Struct(**{'pre_img': True,
 #                 'pre_hm': True,
 #                 'head_kernel': 3,
@@ -72,7 +72,9 @@ for k, v in neck_st_mask.items():
 neck.load_state_dict(neck_st_mask)
 seg.load_state_dict(neck_st_mask, strict=False)
 # load head state_dict
-head.load_state_dict(neck_st_mask,strict=False)
+head_st = torch.load(head_path)
+head.load_state_dict(head_st)
+seg.load_state_dict(head_st,strict=False)
 # move to cuda
 if use_cuda:
     backbone = backbone.cuda()
@@ -107,7 +109,7 @@ head_output = head(neck_out)
 head_output_ori = {}
 for head in seg.heads:
     head_output_ori[head] = seg.__getattr__(head)(neck_out_ori)
-
+head_output_ori = [head_output_ori]
 for head in seg.heads:
-    assert (head_output[head][0]==head_output_ori[head]).all(),f'{head} not match'
+    assert (head_output[0][head][0]==head_output_ori[0][head]).all(),f'{head} not match'
 print('done')
