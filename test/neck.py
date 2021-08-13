@@ -67,9 +67,9 @@ y_ori = []
 for i in range(neck_ori.last_level - neck_ori.first_level):
     y_ori.append(x_ori[i].clone())
 neck_ori.ida_up(y_ori, 0, len(y_ori))
-neck_out_ori = y_ori[-1]
+neck_out_ori = [y_ori[-1]]
 # ---------------------
 neck_out = neck(backbone_out)
-assert (neck_out == neck_out_ori).all(), 'neck_out != neck_out_ori'
+assert (neck_out[-1] == neck_out_ori[-1]).all(), 'neck_out != neck_out_ori'
 
 print('done')
