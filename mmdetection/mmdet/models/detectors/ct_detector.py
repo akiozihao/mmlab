@@ -5,11 +5,11 @@ from mmcv.runner import auto_fp16
 from mmdet.models.builder import DETECTORS
 from mmdet.models.utils import gen_gaussian_target, gaussian_radius
 
-from .centernet import CenterNet
+from .single_stage import SingleStageDetector
 
 
 @DETECTORS.register_module()
-class CTDetector(CenterNet):
+class CTDetector(SingleStageDetector):
     def __init__(self,
                  backbone,
                  neck,
@@ -20,10 +20,10 @@ class CTDetector(CenterNet):
                  init_cfg=None,
                  ):
         super(CTDetector, self).__init__(backbone, neck, bbox_head, train_cfg,
-                                         test_cfg, pretrained, init_cfg)
-        self.fp_disturb = 0.1
-        self.hm_disturb = 0.05
-        self.lost_disturb = 0.4
+                                        test_cfg, pretrained, init_cfg)
+        self.fp_disturb = train_cfg['fp_disturb']
+        self.hm_disturb = train_cfg['hm_disturb']
+        self.lost_disturb = train_cfg['lost_disturb']
 
     @auto_fp16()
     def extract_feat(self, img, pre_img, pre_hm):

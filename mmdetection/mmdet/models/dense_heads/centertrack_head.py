@@ -1,5 +1,6 @@
 import torch
 import torch.nn.functional as F
+from mmcv.runner import BaseModule
 from mmdet.models import HEADS
 from torch import nn
 
@@ -30,10 +31,10 @@ def _sigmoid(x):
 
 
 @HEADS.register_module()
-class CenterTrackHead(nn.Module):
+class CenterTrackHead(BaseModule):
     def __init__(self,
-                 heads, head_convs, num_stacks, last_channel, weights):
-        super(CenterTrackHead, self).__init__()
+                 heads, head_convs, num_stacks, last_channel, weights, init_cfg=None, train_cfg=None, test_cfg=None):
+        super(CenterTrackHead, self).__init__(init_cfg)
         self.crit = FastFocalLoss()
         self.crit_reg = RegWeightedL1Loss()
         head_kernel = 3
@@ -202,7 +203,7 @@ class CenterTrackHead(nn.Module):
                 ltrb_amodal[batch_id, j, 1] = scale_gt_amodal_bbox[j, 1] - cty_int
                 ltrb_amodal[batch_id, j, 2] = scale_gt_amodal_bbox[j, 2] - ctx_int
                 ltrb_amodal[batch_id, j, 3] = scale_gt_amodal_bbox[j, 3] - cty_int
-                ltrb_amodal_mask[batch,j,:] = 1
+                ltrb_amodal_mask[batch, j, :] = 1
 
                 if gt_match_indices[batch_id][j] != -1:
                     idx = gt_match_indices[batch_id][j]
@@ -214,7 +215,7 @@ class CenterTrackHead(nn.Module):
                         scale_ref_ctx, scale_ref_cty = scale_ref_centers[idx]
                         tracking[batch_id, j, 0] = scale_ref_ctx - ctx_int
                         tracking[batch_id, j, 1] = scale_ref_cty - cty_int
-                        tracking_mask[batch_id,j,:] = 1
+                        tracking_mask[batch_id, j, :] = 1
 
         target_result = dict(
             hm=hm,
@@ -224,7 +225,7 @@ class CenterTrackHead(nn.Module):
             reg=reg,
             reg_mask=reg_mask,
             ltrb_amodal=ltrb_amodal,
-            ltrb_amodal_mask = ltrb_amodal_mask,
+            ltrb_amodal_mask=ltrb_amodal_mask,
             tracking=tracking,
             tracking_mask=tracking_mask,
             ind=target_ind
