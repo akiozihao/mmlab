@@ -13,6 +13,7 @@ model = dict(
             type='DLA',
             levels=[1, 1, 1, 2, 2, 1],
             channels=[16, 32, 64, 128, 256, 512],
+            norm_cfg=dict(type='BN', momentum=BN_MOMENTUM),
         ),
         neck=dict(
             type='DLANeck',
