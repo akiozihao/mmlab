@@ -118,7 +118,7 @@ batch = torch.load(batch_path)
 if not use_cuda:
     for k, v in batch.items():
         batch[k] = v.cpu()
-_, loss_out = head.loss(head_output, batch)
+loss_out = head.loss(head_output, batch)
 ## origin loss
 from CenterTrack.src.lib.model.losses import FastFocalLoss, RegWeightedL1Loss
 from CenterTrack.src.lib.model.utils import _sigmoid
@@ -195,7 +195,7 @@ if use_cuda:
     loss_ori = loss_ori.cuda()
 
 _, loss_out_ori = loss_ori(head_output_ori, batch)
-for k in loss_out_ori.keys():
-    assert (loss_out[k] == loss_out_ori[k]).all(), 'Loss: f{k} not match'
+for k in loss_out.keys():
+    assert (loss_out[k] == (opt.weights)[k] * loss_out_ori[k]).all(), f'Loss: {k} not match'
 
 print('done')
