@@ -1,16 +1,17 @@
 import torch
+from CenterTrack.src.lib.model.networks.dla import BasicBlock, DLA as DLA_Ori
+from CenterTrack.src.lib.model.networks.dla import DLASeg
 from mmdet.models.backbones.dla import DLA
 from mmdet.models.dense_heads.centertrack_head import CenterTrackHead
 from mmdet.models.necks.dla_neck import DLANeck
 
-from CenterTrack.src.lib.model.networks.dla import BasicBlock, DLA as DLA_Ori
-from CenterTrack.src.lib.model.networks.dla import DLASeg
-
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = True
 use_cuda = True
-backbone_path = '/home/akio/Downloads/crowdhuman_split/backbone.pt'
-neck_path = '/home/akio/Downloads/crowdhuman_split/neck.pt'
+backbone_path = '../mmpth/backbone.pt'
+backbone_path_ori = '/home/akio/Downloads/crowdhuman_split/backbone.pt'
+neck_path = '../mmpth/neck.pt'
+neck_path_ori = '/home/akio/Downloads/crowdhuman_split/neck.pt'
 opt_path = '/home/akio/Downloads/crowdhuman_split/opt.pt'
 head_path = '/home/akio/Downloads/crowdhuman_split/head.pt'
 # opt = Struct(**{'pre_img': True,
@@ -52,27 +53,25 @@ heads = {
 }
 
 head = CenterTrackHead(
-    heads, head_convs, 1, 64,opt=opt
+    heads, head_convs, 1, 64, opt=opt
 )
 # init origin model
 seg = DLASeg(34, heads, head_convs, opt=opt)
 
 # load backbone state_dict
 backbone_st = torch.load(backbone_path)
+backbone_st_ori = torch.load(backbone_path_ori)
 backbone.load_state_dict(backbone_st)
-backbone_ori.load_state_dict(backbone_st)
+backbone_ori.load_state_dict(backbone_st_ori)
 # load neck state_dict
-neck_st_mask = torch.load(neck_path)
-neck_st = dict()
-for k, v in neck_st_mask.items():
-    nk = k.replace('conv_offset_mask', 'conv_offset')
-    neck_st[nk] = v.clone()
-neck.load_state_dict(neck_st_mask)
-seg.load_state_dict(neck_st_mask, strict=False)
+neck_st = torch.load(neck_path)
+neck_st_ori = torch.load(neck_path_ori)
+neck.load_state_dict(neck_st)
+seg.load_state_dict(neck_st_ori, strict=False)
 # load head state_dict
 head_st = torch.load(head_path)
 head.load_state_dict(head_st)
-seg.load_state_dict(head_st,strict=False)
+seg.load_state_dict(head_st, strict=False)
 # move to cuda
 if use_cuda:
     backbone = backbone.cuda()
@@ -109,5 +108,5 @@ for head in seg.heads:
     head_output_ori[head] = seg.__getattr__(head)(neck_out_ori)
 head_output_ori = [head_output_ori]
 for head in seg.heads:
-    assert (head_output[0][head]==head_output_ori[0][head]).all(),f'{head} not match'
+    assert (head_output[0][head] == head_output_ori[0][head]).all(), f'{head} not match'
 print('done')

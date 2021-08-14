@@ -1,15 +1,16 @@
 import torch
-from mmdet.models.backbones.dla import DLA
-from mmdet.models.necks.dla_neck import DLANeck
-
 from CenterTrack.src.lib.model.networks.dla import BasicBlock, DLA as DLA_Ori
 from CenterTrack.src.lib.model.networks.dla import DLASeg
+from mmdet.models.backbones.dla import DLA
+from mmdet.models.necks.dla_neck import DLANeck
 
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = True
 use_cuda = True
-backbone_path = '/home/akio/Downloads/crowdhuman_split/backbone.pt'
-neck_path = '/home/akio/Downloads/crowdhuman_split/neck.pt'
+backbone_path = '../mmpth/backbone.pt'
+backbone_path_ori = '/home/akio/Downloads/crowdhuman_split/backbone.pt'
+neck_path = '../mmpth/neck.pt'
+neck_path_ori = '/home/akio/Downloads/crowdhuman_split/neck.pt'
 opt_path = '/home/akio/Downloads/crowdhuman_split/opt.pt'
 
 # opt = Struct(**{'pre_img': True,
@@ -37,8 +38,9 @@ neck = DLANeck(34)
 neck_ori = DLASeg(34, heads, head_convs, opt=opt)
 
 backbone_st = torch.load(backbone_path)
+backbone_st_ori = torch.load(backbone_path_ori)
 backbone.load_state_dict(backbone_st)
-backbone_ori.load_state_dict(backbone_st)
+backbone_ori.load_state_dict(backbone_st_ori)
 
 if use_cuda:
     backbone = backbone.cuda()
