@@ -124,7 +124,7 @@ class Tree(BaseModule):
                  dilation=1,
                  root_residual=False,
                  conv_cfg=None,
-                 norm_cfg=dict(type='BN', momentum=BN_MOMENTUM),
+                 norm_cfg=dict(type='BN', momentum=0.1),
                  init_cfg=None
                  ):
         super(Tree, self).__init__(init_cfg)
@@ -231,7 +231,7 @@ class DLA(BaseModule):
                  residual_root=False,
                  use_pre_img=True, use_pre_hm=True,
                  conv_cfg=None,
-                 norm_cfg=dict(type='BN', momentum=BN_MOMENTUM),
+                 norm_cfg=dict(type='BN', momentum=0.1),
                  init_cfg=None
                  ):
         super(DLA, self).__init__(init_cfg)
