@@ -1,36 +1,29 @@
+import math
+
 import numpy as np
-from mmcv.ops import ModulatedDeformConv2dPack
+from CenterTrack.src.lib.model.networks.DCNv2.dcn_v2 import DCN
+from mmcv.cnn import ConvModule
+from mmcv.cnn import build_conv_layer
+from mmcv.runner import BaseModule
 from mmdet.models.builder import NECKS
 from torch import nn
-import math
-BN_MOMENTUM = 0.1
-from CenterTrack.src.lib.model.networks.DCNv2.dcn_v2 import DCN
-
-def fill_up_weights(up):
-    w = up.weight.data
-    f = math.ceil(w.size(2) / 2)
-    c = (2 * f - 1 - f % 2) / (2. * f)
-    for i in range(w.size(2)):
-        for j in range(w.size(3)):
-            w[0, 0, i, j] = \
-                (1 - math.fabs(i / f - c)) * (1 - math.fabs(j / f - c))
-    for c in range(1, w.size(0)):
-        w[c, 0, :, :] = w[0, 0, :, :]
+from mmcv.ops import ModulatedDeformConv2dPack
 
 
 class DeformConv(nn.Module):
     def __init__(self, chi, cho):
         super(DeformConv, self).__init__()
         self.actf = nn.Sequential(
-            nn.BatchNorm2d(cho, momentum=BN_MOMENTUM),
+            nn.BatchNorm2d(cho, momentum=0.1),
             nn.ReLU(inplace=True)
         )
-        self.conv = DCN(chi, cho, kernel_size=(3,3), stride=1, padding=1, dilation=1, deformable_groups=1)
+        self.conv = DCN(chi, cho, kernel_size=(3, 3), stride=1, padding=1, dilation=1, deformable_groups=1)
 
     def forward(self, x):
         x = self.conv(x)
         x = self.actf(x)
         return x
+
 
 # class DeformConv(nn.Module):
 #     def __init__(self, chi, cho):
@@ -56,19 +49,55 @@ class DeformConv(nn.Module):
 #         return x
 
 
-class IDAUp(nn.Module):
-    def __init__(self, o, channels, up_f, node_type=(DeformConv, DeformConv)):
-        super(IDAUp, self).__init__()
+class IDAUp(BaseModule):
+    def __init__(self,
+                 planes,
+                 channels,
+                 up_f,
+                 use_dcn=True,
+                 conv_cfg=None,
+                 norm_cfg=dict(type='BN', momentum=0.1),
+                 init_cfg=None
+                 ):
+        super(IDAUp, self).__init__(init_cfg)
         for i in range(1, len(channels)):
             c = channels[i]
             f = int(up_f[i])
-            proj = node_type[0](c, o)
-            node = node_type[1](o, o)
+            # todo check mmtracking dcnv2
+            if use_dcn:
+                proj = DeformConv(c, planes)
+                node = DeformConv(planes, planes)
+            else:
+                proj = ConvModule(
+                    c,
+                    planes,
+                    3,
+                    padding=1,
+                    conv_cfg=conv_cfg,
+                    norm_cfg=norm_cfg,
+                    bias=True
+                )
+                node = ConvModule(
+                    planes,
+                    planes,
+                    3,
+                    padding=1,
+                    conv_cfg=conv_cfg,
+                    norm_cfg=norm_cfg,
+                    bias=True
+                )
 
-            up = nn.ConvTranspose2d(o, o, f * 2, stride=f,
-                                    padding=f // 2, output_padding=0,
-                                    groups=o, bias=False)
-            fill_up_weights(up)
+            up = build_conv_layer(
+                dict(type='deconv'),
+                planes,
+                planes,
+                f * 2,
+                stride=f,
+                padding=f // 2,
+                output_padding=0,
+                groups=planes,
+                bias=False,
+            )
 
             setattr(self, 'proj_' + str(i), proj)
             setattr(self, 'up_' + str(i), up)
@@ -82,11 +111,44 @@ class IDAUp(nn.Module):
             node = getattr(self, 'node_' + str(i - startp))
             layers[i] = node(layers[i] + layers[i - 1])
 
+    def init_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.ConvTranspose2d):
+                # In order to be consistent with the source code,
+                # reset the ConvTranspose2d initialization parameters
+                m.reset_parameters()
+                # Simulated bilinear upsampling kernel
+                w = m.weight.data
+                f = math.ceil(w.size(2) / 2)
+                c = (2 * f - 1 - f % 2) / (2. * f)
+                for i in range(w.size(2)):
+                    for j in range(w.size(3)):
+                        w[0, 0, i, j] = \
+                            (1 - math.fabs(i / f - c)) * (
+                                    1 - math.fabs(j / f - c))
+                for c in range(1, w.size(0)):
+                    w[c, 0, :, :] = w[0, 0, :, :]
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+            # self.use_dcn is False
+            elif not self.use_dcn and isinstance(m, nn.Conv2d):
+                # In order to be consistent with the source code,
+                # reset the Conv2d initialization parameters
+                m.reset_parameters()
 
-class DLAUp(nn.Module):
-    def __init__(self, startp, channels, scales, in_channels=None,
-                 node_type=DeformConv):
-        super(DLAUp, self).__init__()
+
+class DLAUp(BaseModule):
+    def __init__(self,
+                 startp,
+                 channels,
+                 scales,
+                 in_channels=None,
+                 use_dcn=True,
+                 conv_cfg=None,
+                 norm_cfg=dict(type='BN', momentum=0.1),
+                 init_cfg=None):
+        super(DLAUp, self).__init__(init_cfg)
         self.startp = startp
         if in_channels is None:
             in_channels = channels
@@ -98,7 +160,10 @@ class DLAUp(nn.Module):
             setattr(self, 'ida_{}'.format(i),
                     IDAUp(channels[j], in_channels[j:],
                           scales[j:] // scales[j],
-                          node_type=node_type))
+                          use_dcn=use_dcn,
+                          conv_cfg=conv_cfg,
+                          norm_cfg=norm_cfg,
+                          init_cfg=init_cfg))
             scales[j + 1:] = scales[j]
             in_channels[j + 1:] = [channels[j] for _ in channels[j + 1:]]
 
@@ -111,20 +176,19 @@ class DLAUp(nn.Module):
         return out
 
 
-DLA_NODE = {
-    'dcn': (DeformConv, DeformConv),
-}
-
-
 @NECKS.register_module()
-class DLANeck(nn.Module):
+class DLANeck(BaseModule):
     arch_settings = {
         34: ([16, 32, 64, 128, 256, 512], 4)
     }
 
-    def __init__(self, arch):
-        super(DLANeck, self).__init__()
-        self.node_type = DLA_NODE['dcn']
+    def __init__(self,
+                 arch,
+                 use_dcn=True,
+                 conv_cfg=None,
+                 norm_cfg=dict(type='BN', momentum=0.1),
+                 init_cfg=None):
+        super(DLANeck, self).__init__(init_cfg)
         assert arch == 34, 'Only support dla-34.'
         channels = self.arch_settings[arch][0]
         down_ratio = self.arch_settings[arch][1]
@@ -134,13 +198,21 @@ class DLANeck(nn.Module):
         self.dla_up = DLAUp(
             self.first_level,
             channels[self.first_level:],
-            scales, node_type=self.node_type)
+            scales,
+            use_dcn=use_dcn,
+            conv_cfg=conv_cfg,
+            norm_cfg=norm_cfg,
+            init_cfg=init_cfg
+        )
         out_channel = channels[self.first_level]
 
         self.ida_up = IDAUp(
             out_channel, channels[self.first_level:self.last_level],
             [2 ** i for i in range(self.last_level - self.first_level)],
-            node_type=self.node_type
+            use_dcn=use_dcn,
+            conv_cfg=conv_cfg,
+            norm_cfg=norm_cfg,
+            init_cfg=init_cfg
         )
 
     def forward(self, x):
