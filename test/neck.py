@@ -34,7 +34,8 @@ backbone = DLA(levels=[1, 1, 1, 2, 2, 1],
 backbone_ori = DLA_Ori([1, 1, 1, 2, 2, 1],
                        [16, 32, 64, 128, 256, 512],
                        block=BasicBlock, opt=opt)
-neck = DLANeck(34)
+neck = DLANeck(channels=[16, 32, 64, 128, 256, 512],
+               down_ratio=4)
 neck_ori = DLASeg(34, heads, head_convs, opt=opt)
 
 backbone_st = torch.load(backbone_path)

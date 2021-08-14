@@ -32,14 +32,14 @@ def _sigmoid(x):
 @HEADS.register_module()
 class CenterTrackHead(nn.Module):
     def __init__(self,
-                 heads, head_convs, num_stacks, last_channel, opt):
+                 heads, head_convs, num_stacks, last_channel,weights):
         super(CenterTrackHead, self).__init__()
-        self.opt = opt
         self.crit = FastFocalLoss()
         self.crit_reg = RegWeightedL1Loss()
         head_kernel = 3
         self.num_stacks = num_stacks
         self.heads = heads
+        self.weights=weights
         for head in self.heads:
             classes = self.heads[head]
             head_conv = head_convs[head]
@@ -106,17 +106,16 @@ class CenterTrackHead(nn.Module):
         pass
 
     def loss(self, outputs, batch):
-        opt = self.opt
-        losses = {head: 0 for head in opt.heads}
+        losses = {head: 0 for head in self.heads}
 
-        for s in range(opt.num_stacks):
+        for s in range(self.num_stacks):
             output = outputs[s]
             output = self._sigmoid_output(output)
 
             if 'hm' in output:
                 losses['hm'] += self.crit(
                     output['hm'], batch['hm'], batch['ind'],
-                    batch['mask'], batch['cat']) / opt.num_stacks
+                    batch['mask'], batch['cat']) / self.num_stacks
 
             regression_heads = [
                 'reg', 'wh', 'tracking', 'ltrb', 'ltrb_amodal', 'hps',
@@ -126,30 +125,30 @@ class CenterTrackHead(nn.Module):
                 if head in output:
                     losses[head] += self.crit_reg(
                         output[head], batch[head + '_mask'],
-                        batch['ind'], batch[head]) / opt.num_stacks
+                        batch['ind'], batch[head]) / self.num_stacks
 
             if 'hm_hp' in output:
                 losses['hm_hp'] += self.crit(
                     output['hm_hp'], batch['hm_hp'], batch['hp_ind'],
-                    batch['hm_hp_mask'], batch['joint']) / opt.num_stacks
+                    batch['hm_hp_mask'], batch['joint']) / self.num_stacks
                 if 'hp_offset' in output:
                     losses['hp_offset'] += self.crit_reg(
                         output['hp_offset'], batch['hp_offset_mask'],
-                        batch['hp_ind'], batch['hp_offset']) / opt.num_stacks
+                        batch['hp_ind'], batch['hp_offset']) / self.num_stacks
 
             if 'rot' in output:
                 losses['rot'] += self.crit_rot(
                     output['rot'], batch['rot_mask'], batch['ind'], batch['rotbin'],
-                    batch['rotres']) / opt.num_stacks
+                    batch['rotres']) / self.num_stacks
 
             if 'nuscenes_att' in output:
                 losses['nuscenes_att'] += self.crit_nuscenes_att(
                     output['nuscenes_att'], batch['nuscenes_att_mask'],
-                    batch['ind'], batch['nuscenes_att']) / opt.num_stacks
+                    batch['ind'], batch['nuscenes_att']) / self.num_stacks
 
         losses['tot'] = 0
-        for head in opt.heads:
-            losses['tot'] += opt.weights[head] * losses[head]
+        for head in self.heads:
+            losses['tot'] += self.weights[head] * losses[head]
 
         return losses['tot'], losses
 

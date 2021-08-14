@@ -178,20 +178,15 @@ class DLAUp(BaseModule):
 
 @NECKS.register_module()
 class DLANeck(BaseModule):
-    arch_settings = {
-        34: ([16, 32, 64, 128, 256, 512], 4)
-    }
 
     def __init__(self,
-                 arch,
+                 channels,
+                 down_ratio,
                  use_dcn=True,
                  conv_cfg=None,
                  norm_cfg=dict(type='BN', momentum=0.1),
                  init_cfg=None):
         super(DLANeck, self).__init__(init_cfg)
-        assert arch == 34, 'Only support dla-34.'
-        channels = self.arch_settings[arch][0]
-        down_ratio = self.arch_settings[arch][1]
         self.first_level = int(np.log2(down_ratio))
         self.last_level = 5
         scales = [2 ** i for i in range(len(channels[self.first_level:]))]

@@ -226,7 +226,6 @@ class DLA(BaseModule):
     def __init__(self,
                  levels,
                  channels,
-                 num_classes=1000,
                  block=DLABasicBlock,
                  residual_root=False,
                  use_pre_img=True, use_pre_hm=True,
@@ -238,7 +237,6 @@ class DLA(BaseModule):
         self.conv_cfg = conv_cfg
         self.norm_cfg = norm_cfg
         self.channels = channels
-        self.num_classes = num_classes
         self.base_layer = ConvModule(
             3,
             channels[0],

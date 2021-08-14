@@ -36,7 +36,8 @@ backbone_ori = DLA_Ori([1, 1, 1, 2, 2, 1],
                        [16, 32, 64, 128, 256, 512],
                        block=BasicBlock, opt=opt)
 # init neck
-neck = DLANeck(34)
+neck = DLANeck(channels=[16, 32, 64, 128, 256, 512],
+               down_ratio=4)
 
 # init head
 head_convs = {
@@ -55,7 +56,7 @@ heads = {
 }
 
 head = CenterTrackHead(
-    heads, head_convs, 1, 64, opt=opt
+    heads, head_convs, 1, 64,weights=dict(hm=1, reg=1, wh=0.1, tracking=1, ltrb_amodal=0.1)
 )
 # init origin model
 seg = DLASeg(34, heads, head_convs, opt=opt)
