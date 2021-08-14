@@ -93,16 +93,12 @@ class CenterTrackHead(BaseModule):
             out.append(z)
         return out
 
-    def forward_train(self, x, img_metas, gt_bboxes, gt_labels, gt_match_indices,
-                      ref_img_metas, ref_gt_boxes, ref_gt_labels, ref_gt_match_indices,
-                      ref_hm,
-                      gt_bboxes_ignore=None,
-                      ref_gt_bboxes_ignore=None):
+    def forward_train(self, x, batch):
         out = self(x)
         out = self._sigmoid_output(out)
-        batch = self.get_target(gt_bboxes, gt_labels, feat_shape, img_shape,
-                                gt_match_indices,
-                                ref_gt_bboxes)
+        # batch = self.get_target(gt_bboxes, gt_labels, feat_shape, img_shape,
+        #                         gt_match_indices,
+        #                         ref_gt_bboxes)
         losses = self.loss(out, batch)
         return losses
 

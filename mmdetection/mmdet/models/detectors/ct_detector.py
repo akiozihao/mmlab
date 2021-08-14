@@ -33,27 +33,19 @@ class CTDetector(SingleStageDetector):
         return x
 
     def forward_train(self,
-                      img,
-                      img_metas,
-                      gt_bboxes,
-                      gt_labels,
-                      gt_match_indices,
-                      ref_img_metas,
-                      ref_img,
-                      ref_gt_bboxes,
-                      ref_gt_labels,
-                      ref_gt_match_indices):
-        ref_hm = self._build_ref_hm(ref_gt_bboxes, ref_gt_labels, img.shape)
-        batch_input_shape = tuple(img[0].size()[-2:])
-        for img_meta in img_metas:
-            img_meta['batch_input_shape'] = batch_input_shape
-        for img_meta in ref_img_metas:
-            img_meta['batch_input_shape'] = batch_input_shape
-        x = self.backbone(img, ref_img, ref_hm)
+                      image,
+                      pre_img,
+                      pre_hm,
+                      **kwargs):
+        # ref_hm = self._build_ref_hm(ref_gt_bboxes, ref_gt_labels, img.shape)
+        # batch_input_shape = tuple(img[0].size()[-2:])
+        # for img_meta in img_metas:
+        #     img_meta['batch_input_shape'] = batch_input_shape
+        # for img_meta in ref_img_metas:
+        #     img_meta['batch_input_shape'] = batch_input_shape
+        x = self.backbone(image, pre_img, pre_hm)
         x = self.neck(x)
-        losses = self.bbox_head.forward_train(x, img_metas, gt_bboxes, gt_labels, gt_match_indices,
-                                              ref_img_metas, ref_gt_bboxes, ref_gt_labels, ref_gt_match_indices,
-                                              ref_hm)
+        losses = self.bbox_head.forward_train(x, kwargs)
         return losses
 
     def _build_ref_hm(self, gt_bboxes, gt_labels, img_shape):
