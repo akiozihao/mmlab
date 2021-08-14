@@ -195,8 +195,8 @@ if use_cuda:
     loss_ori = loss_ori.cuda()
 
 loss_total_ori, loss_out_ori = loss_ori(head_output_ori, batch)
-for k in loss_out_ori.keys():
-    assert (loss_out[k] == loss_out_ori[k]).all(), 'Loss: f{k} not match'
+for k in loss_out.keys():
+    assert (loss_out[k] == (opt.weights)[k] * loss_out_ori[k]).all(), f'Loss: {k} not match'
 
 # backward
 loss_total_ori.backward()
