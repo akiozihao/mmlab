@@ -1,4 +1,6 @@
 import torch
+from mmcv.runner import load_checkpoint
+from mmcv.utils import print_log
 from mmdet.core import bbox2result
 from mmdet.models import build_detector
 from mmtrack.core import track2result
@@ -15,8 +17,9 @@ class CenterTrack(BaseMultiObjectTracker):
                  pretrains=None,
                  pre_thresh=0.5,
                  use_pre_hm=True,
+                 init_cfg=None
                  ):
-        super(CenterTrack, self).__init__()
+        super(CenterTrack, self).__init__(init_cfg)
         if detector is not None:
             self.detector = build_detector(detector)
 
@@ -32,7 +35,7 @@ class CenterTrack(BaseMultiObjectTracker):
         self.pre_hm = None
         self.pre_bboxes = None
 
-    def init_weights(self, pretrain):
+    def init_weights(self, pretrain=None):
         """Initialize the weights of the modules.
 
         Args:
@@ -43,6 +46,24 @@ class CenterTrack(BaseMultiObjectTracker):
         assert isinstance(pretrain, dict), '`pretrain` must be a dict.'
         if self.with_detector and pretrain.get('detector', False):
             self.init_module('detector', pretrain['detector'])
+
+    def init_module(self, module_name, pretrain=None):
+        """Initialize the weights of a sub-module.
+        Args:
+            module (nn.Module): A sub-module of the model.
+            pretrained (str, optional): Path to pre-trained weights.
+                Defaults to None.
+        """
+        module = getattr(self, module_name)
+        if pretrain is not None:
+            print_log(
+                f'load {module_name} from: {pretrain}', logger=self.logger)
+            checkpoint = load_checkpoint(
+                module, pretrain, strict=False, logger=self.logger)
+            if 'meta' in checkpoint and 'CLASSES' in checkpoint['meta']:
+                module.CLASSES = checkpoint['meta']['CLASSES']
+        else:
+            module.init_weights()
 
     def simple_test(self,
                     img,
@@ -95,7 +116,12 @@ class CenterTrack(BaseMultiObjectTracker):
         batch_input_shape = tuple(img[0].size()[-2:])
         img_metas[0]['batch_input_shape'] = batch_input_shape
         x = self.detector.extract_feat(img, self.ref_img, self.ref_hm)
-        center_heatmap_pred, wh_pred, offset_pred, tracking_pred, ltrb_amodal_pred = self.detector.bbox_head(x)
+        bbox_head_out = self.detector.bbox_head(x)[0]
+        center_heatmap_pred = bbox_head_out['hm']
+        wh_pred = bbox_head_out['wh']
+        offset_pred = bbox_head_out['reg']
+        tracking_pred = bbox_head_out['tracking']
+        ltrb_amodal_pred = bbox_head_out['ltrb_amodal']
         outs = [center_heatmap_pred, wh_pred, offset_pred, tracking_pred, ltrb_amodal_pred]
         result_list = self.detector.bbox_head.get_bboxes(
             # todo Are outs always tensors?
