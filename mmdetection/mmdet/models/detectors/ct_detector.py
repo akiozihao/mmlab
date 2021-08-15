@@ -1,11 +1,35 @@
 import random
+from math import sqrt
 
 import torch
 from mmcv.runner import auto_fp16
 from mmdet.models.builder import DETECTORS
-from mmdet.models.utils import gen_gaussian_target, gaussian_radius
+from mmdet.models.utils import gen_gaussian_target
 
 from .single_stage import SingleStageDetector
+
+
+def gaussian_radius(det_size, min_overlap=0.7):
+    height, width = det_size
+
+    a1 = 1
+    b1 = (height + width)
+    c1 = width * height * (1 - min_overlap) / (1 + min_overlap)
+    sq1 = sqrt(b1 ** 2 - 4 * a1 * c1)
+    r1 = (b1 + sq1) / 2
+
+    a2 = 4
+    b2 = 2 * (height + width)
+    c2 = (1 - min_overlap) * width * height
+    sq2 = sqrt(b2 ** 2 - 4 * a2 * c2)
+    r2 = (b2 + sq2) / 2
+
+    a3 = 4 * min_overlap
+    b3 = -2 * min_overlap * (height + width)
+    c3 = (min_overlap - 1) * width * height
+    sq3 = sqrt(b3 ** 2 - 4 * a3 * c3)
+    r3 = (b3 + sq3) / 2
+    return min(r1, r2, r3)
 
 
 @DETECTORS.register_module()
@@ -20,7 +44,7 @@ class CTDetector(SingleStageDetector):
                  init_cfg=None,
                  ):
         super(CTDetector, self).__init__(backbone, neck, bbox_head, train_cfg,
-                                        test_cfg, pretrained, init_cfg)
+                                         test_cfg, pretrained, init_cfg)
         self.fp_disturb = train_cfg['fp_disturb']
         self.hm_disturb = train_cfg['hm_disturb']
         self.lost_disturb = train_cfg['lost_disturb']
@@ -64,8 +88,8 @@ class CTDetector(SingleStageDetector):
         for batch_id in range(batch_size):
             gt_bbox = gt_bboxes[batch_id].clone()
             # clip
-            gt_bbox[:, [0, 2]] = torch.clip(gt_bbox[:, [0, 2]], 0, img_w)
-            gt_bbox[:, [1, 3]] = torch.clip(gt_bbox[:, [1, 3]], 0, img_h)
+            gt_bbox[:, [0, 2]] = torch.clip(gt_bbox[:, [0, 2]], 0, img_w - 1)
+            gt_bbox[:, [1, 3]] = torch.clip(gt_bbox[:, [1, 3]], 0, img_h - 1)
             gt_label = gt_labels[batch_id]
             center_x = (gt_bbox[:, [0]] + gt_bbox[:, [2]]) / 2
             center_y = (gt_bbox[:, [1]] + gt_bbox[:, [3]]) / 2
@@ -74,10 +98,16 @@ class CTDetector(SingleStageDetector):
             for j, ct in enumerate(gt_centers):
                 box_h = (gt_bbox[j][3] - gt_bbox[j][1])
                 box_w = (gt_bbox[j][2] - gt_bbox[j][0])
-                ctx_int, cty_int = ct.int()
-                radius = gaussian_radius([box_h, box_w], min_overlap=0.3)
+                if box_w <= 0 or box_h <= 0:
+                    continue
+
+                radius = gaussian_radius([torch.ceil(box_h), torch.ceil(box_w)])
                 radius = max(0, int(radius))
                 ind = gt_label[j]
+
+                ct[0] = ct[0] + random.random() * self.hm_disturb * box_w
+                ct[1] = ct[1] + random.random() * self.hm_disturb * box_h
+                ctx_int, cty_int = ct.int()
                 gen_gaussian_target(heatmap[batch_id, ind],
                                     [ctx_int, cty_int], radius)
 
@@ -107,8 +137,7 @@ class CTDetector(SingleStageDetector):
             scale_box_w = (bboxes[j][2] - bboxes[j][0])
             if scale_box_h <= 0 or scale_box_w <= 0:
                 continue
-            radius = gaussian_radius([scale_box_h, scale_box_w],
-                                     min_overlap=0.3)  # check
+            radius = gaussian_radius([scale_box_h, scale_box_w])  # check
             radius = max(0, int(radius))
 
             ct[0] = torch.ceil(ct[0] + random.random() * self.bbox_head.hm_disturb * scale_box_w)

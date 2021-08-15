@@ -227,8 +227,7 @@ class CenterTrackHead(BaseModule):
                 gen_gaussian_target(hm[batch_id, gt_label[j]],
                                     [ctx_int, cty_int], radius)
 
-                ind = cty_int * feat_w + ctx_int
-                target_ind[batch_id, j] = ind
+                target_ind[batch_id, j] = cty_int * feat_w + ctx_int
 
                 wh[batch_id, j, 0] = scale_box_w
                 wh[batch_id, j, 1] = scale_box_h
