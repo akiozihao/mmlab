@@ -56,7 +56,13 @@ heads = {
 }
 
 head = CenterTrackHead(
-    heads, head_convs, 1, 64,weights=dict(hm=1, reg=1, wh=0.1, tracking=1, ltrb_amodal=0.1)
+    heads=dict(hm=1, reg=2, wh=2, tracking=2, ltrb_amodal=4),
+    head_convs=dict(hm=[256], reg=[256], wh=[256], tracking=[256], ltrb_amodal=[256]),
+    num_stacks=1,
+    last_channel=64,
+    weights=dict(hm=1, reg=1, wh=0.1, tracking=1, ltrb_amodal=0.1),
+    test_cfg=dict(topk=100, local_maximum_kernel=3, max_per_img=100),
+    train_cfg=dict(fp_disturb=0.1, lost_disturb=0.4, hm_disturb=0.05)
 )
 # init origin model
 seg = DLASeg(34, heads, head_convs, opt=opt)
@@ -196,6 +202,7 @@ if use_cuda:
 
 _, loss_out_ori = loss_ori(head_output_ori, batch)
 for k in loss_out.keys():
-    assert (loss_out[k] == (opt.weights)[k] * loss_out_ori[k]).all(), f'Loss: {k} not match'
+    assert (loss_out[k] == (opt.weights)[k[5:]] * loss_out_ori[
+        k[5:]]).all(), f'Loss: {k} not match'
 
 print('done')
