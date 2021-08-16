@@ -1,3 +1,4 @@
+import math
 import random
 from math import sqrt
 
@@ -48,6 +49,7 @@ class CTDetector(SingleStageDetector):
         self.fp_disturb = train_cfg['fp_disturb']
         self.hm_disturb = train_cfg['hm_disturb']
         self.lost_disturb = train_cfg['lost_disturb']
+        self.num_classes = 1
 
     @auto_fp16()
     def extract_feat(self, img, pre_img, pre_hm):
@@ -83,8 +85,6 @@ class CTDetector(SingleStageDetector):
         batch_input_shape = tuple(img[0].size()[-2:])
 
         for img_meta in img_metas:
-            img_meta['batch_input_shape'] = batch_input_shape
-        for img_meta in ref_img_metas:
             img_meta['batch_input_shape'] = batch_input_shape
         x = self.backbone(img, ref_img, ref_hm)
         x = self.neck(x)
@@ -178,13 +178,13 @@ class CTDetector(SingleStageDetector):
         """
         Returns: dict
              img,ref_img,ref_hm
-             hm_target,reg_target,tracking_target,wh_target,ltrb_amodal_target
+             hm_target,reg_target,tracking_target,wh_target,ltrb_amodal_target,ind
         """
         batch = dict()
 
-        img_h, img_w = img_metas[0]['pad_shape']
+        img_h, img_w = img_metas[0]['pad_shape'][:2]
         bs = img.shape[0]
-        feat_w, feat_h = img_w / down_ratio, img_h / down_ratio
+        feat_w, feat_h = int(img_w / down_ratio), int(img_h / down_ratio)
         width_ratio = float(feat_w / img_w)
         height_ratio = float(feat_h / img_h)
         max_obj = 256
@@ -248,31 +248,37 @@ class CTDetector(SingleStageDetector):
             scale_gt_amodal_centers = torch.cat((scale_gt_amodal_center_x, scale_gt_amodal_center_y), dim=1)
             ref_centers = torch.cat((ref_center_x, ref_center_y), dim=1)
             # build ref hm and update ref_centers
-            for i in range(ref_centers.shape[0]):
+            for idx in range(ref_centers.shape[0]):
                 ref_h = ref_bbox[idx][3] - ref_bbox[idx][1]
                 ref_w = ref_bbox[idx][2] - ref_bbox[idx][0]
                 if ref_h <= 0 or ref_w <= 0:
                     continue
-                ct0 = ref_centers[i].clone()
+
+                radius = gaussian_radius((math.ceil(ref_h), math.ceil(ref_w)))
+                radius = max(0, int(radius))
+
+                ct0 = ref_centers[idx]
+                ct = ref_centers[idx].clone()
 
                 ct[0] = ct[0] + random.random() * self.hm_disturb * ref_w
                 ct[1] = ct[1] + random.random() * self.hm_disturb * ref_h
-                conf = 1 if random.random > self.lost_disturb else 0
+                conf = 1 if random.random() > self.lost_disturb else 0
 
                 ct_int = ct.int()
                 if conf == 0:
-                    ref_centers[i] = ct
+                    ref_centers[idx] = ct
 
-                gen_gaussian_target(pre_hm[batch_id, 0], ct_int[0], ct_int[1], k=conf)
+                gen_gaussian_target(pre_hm[batch_id, 0], ct_int, radius, k=conf)
 
                 if random.random() < self.fp_disturb:
-                    ct2 = ct0.copy()
+                    ct2 = ct0.clone()
                     ct2[0] = ct2[0] + random.random() * 0.05 * ref_w
                     ct2[1] = ct2[1] + random.random() * 0.05 * ref_h
                     ct2_int = ct2.int()
-                    gen_gaussian_target(pre_hm[batch_id, 0], ct2_int[0], ct2_int[1], k=conf)
+                    gen_gaussian_target(pre_hm[batch_id, 0], ct2_int, radius, k=conf)
 
             num_obj = min(max_obj, scale_gt_centers.shape[0])
+
             for j in range(num_obj):
                 ct = scale_gt_centers[j]
                 ctx, cty = ct
@@ -332,4 +338,5 @@ class CTDetector(SingleStageDetector):
         batch['mask'] = mask
         batch['cat'] = cat
         batch['img_metas'] = img_metas
+        batch['ind'] = target_ind
         return batch
