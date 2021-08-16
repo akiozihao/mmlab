@@ -3,7 +3,6 @@ import random
 from math import sqrt
 
 import torch
-from mmcv.runner import auto_fp16
 from mmdet.models.builder import DETECTORS
 from mmdet.models.utils import gen_gaussian_target
 
@@ -51,7 +50,6 @@ class CTDetector(SingleStageDetector):
         self.lost_disturb = train_cfg['lost_disturb']
         self.num_classes = 1
 
-    @auto_fp16()
     def extract_feat(self, img, pre_img, pre_hm):
         """Directly extract features from the backbone+neck."""
         x = self.backbone(img, pre_img, pre_hm)
