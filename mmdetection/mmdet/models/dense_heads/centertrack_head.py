@@ -4,7 +4,6 @@ import torch
 import torch.nn.functional as F
 from mmcv.runner import BaseModule
 from mmdet.models import HEADS
-from mmdet.models.utils import gen_gaussian_target
 from mmdet.models.utils.gaussian_target import get_local_maximum, get_topk_from_heatmap, transpose_and_gather_feat
 from torch import nn
 
@@ -129,8 +128,8 @@ class CenterTrackHead(BaseModule):
     def forward_train(self, x, batch):
         outs = self(x)
         outs = self._sigmoid_output(outs)
-        losses = self.loss(outs, batch)
-        return losses
+        loss = self.loss(outs, batch)
+        return loss
 
     def _sigmoid_output(self, output):
         if 'hm' in output:
@@ -311,6 +310,11 @@ class CenterTrackHead(BaseModule):
             nk = 'loss_' + k
             format_loss[nk] = v
         return format_loss
+        # losses['tot'] = 0
+        # for head in self.heads:
+        #     losses['tot'] += self.weights[head] * losses[head]
+        #
+        # return losses['tot'], losses
 
     def get_bboxes(self,
                    center_heatmap_preds,

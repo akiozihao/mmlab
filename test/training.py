@@ -7,12 +7,12 @@ from CenterTrack.src.lib.dataset.datasets.mot import MOT
 
 import_modules_from_strings(
     ['mmdet.models.backbones.dla',
-             'mmdet.models.necks.dla_neck',
-             'mmdet.models.dense_heads.centertrack_head',
-             'mmdet.models.detectors.ct_detector',
-             'mmtrack.models.mot.trackers.ct_tracker',
-             'mmtrack.models.mot.center_track',
-             'mmtrack.datasets.pipelines.transforms']
+     'mmdet.models.necks.dla_neck',
+     'mmdet.models.dense_heads.centertrack_head',
+     'mmdet.models.detectors.ct_detector',
+     'mmtrack.models.mot.trackers.ct_tracker',
+     'mmtrack.models.mot.center_track',
+     'mmtrack.datasets.pipelines.transforms']
 )
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = True
@@ -57,39 +57,40 @@ model = CTDetector(
 # model.neck.load_state_dict(neck_st)
 # model.bbox_head.load_state_dict(head_st)
 
-st = torch.load('/home/akio/dev/mmlab/models/1_epoch_60.pth')
+st = torch.load('/home/akio/dev/mmlab/models/new_model.pth')['state_dict']
 model.load_state_dict(st)
 model = model.cuda()
 
 opt = torch.load(opt_path)
 opt.data_dir = '../data'
 
-optimizer = torch.optim.Adam(model.parameters(), lr=1.25e-5 / 8)
+optimizer = torch.optim.Adam(model.parameters(), lr=1.25e-4 / 8)
 train_loader = torch.utils.data.DataLoader(
     MOT(opt, 'train'), batch_size=2, shuffle=True,
-    num_workers=6, pin_memory=True, drop_last=True
+    num_workers=4, pin_memory=True, drop_last=True
 )
 model.train()
-total_epoch = 11
-for epoch in range(total_epoch):
+total_epoch = 72
+for epoch in range(1,total_epoch):
     print(f'Epoch {epoch} start.....')
     stat = []
     if epoch == 60:
         for param_group in optimizer.param_groups:
             param_group['lr'] = 1.25e-5 / 8
     for batch in tqdm(train_loader):
-        for k,v in batch.items():
+        for k, v in batch.items():
             batch[k] = v.cuda()
-        loss_stats = model.forward_train(batch)
-        total_loss = torch.zeros(1,requires_grad=True).cuda()
+        _, loss, loss_stats = model.forward_train(batch)
+        loss = loss.mean()
         for k, v in loss_stats.items():
-            total_loss += v
-        stat.append(total_loss)
+            loss += v
+        stat.append(loss)
         optimizer.zero_grad()
-        total_loss.backward()
+        loss.backward()
         optimizer.step()
     print(f'Epoch {epoch} mean loss : {torch.tensor(stat).mean()}')
     stat.clear()
 
-    if epoch % 10 == 0:
-        torch.save(model.state_dict(), f'/home/akio/dev/mmlab/models/2_epoch_{epoch}.pth')
+    if epoch % 5 == 0:
+        torch.save(model.state_dict(), f'/home/akio/dev/mmlab/models/4_epoch_{epoch}.pth')
+        break

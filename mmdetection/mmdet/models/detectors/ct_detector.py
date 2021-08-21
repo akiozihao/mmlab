@@ -64,7 +64,7 @@ class CTDetector(SingleStageDetector):
                       gt_match_indices,
                       ref_img,
                       ref_gt_bboxes,
-                      ref_gt_labels, ):
+                      ref_gt_labels):
         batch = self._input2targets(
             img,
             img_metas,
@@ -79,11 +79,11 @@ class CTDetector(SingleStageDetector):
         img = batch['image']
         ref_img = batch['pre_img']
         ref_hm = batch['pre_hm']
-        img_metas = batch['img_metas']
+        # img_metas = batch['img_metas']
         batch_input_shape = tuple(img[0].size()[-2:])
 
-        for img_meta in img_metas:
-            img_meta['batch_input_shape'] = batch_input_shape
+        # for img_meta in img_metas:
+        #     img_meta['batch_input_shape'] = batch_input_shape
         x = self.backbone(img, ref_img, ref_hm)
         x = self.neck(x)
         losses = self.bbox_head.forward_train(x, batch)
@@ -149,8 +149,8 @@ class CTDetector(SingleStageDetector):
             radius = gaussian_radius([scale_box_h, scale_box_w])  # check
             radius = max(0, int(radius))
 
-            ct[0] = torch.ceil(ct[0] + random.random() * self.bbox_head.hm_disturb * scale_box_w)
-            ct[1] = torch.ceil(ct[1] + random.random() * self.bbox_head.hm_disturb * scale_box_h)
+            ct[0] = torch.ceil(ct[0] + torch.randn(1,device=bboxes.device) * self.bbox_head.hm_disturb * scale_box_w)
+            ct[1] = torch.ceil(ct[1] + torch.randn(1,device=bboxes.device) * self.bbox_head.hm_disturb * scale_box_h)
             ctx_int, cty_int = ct.int()
             gen_gaussian_target(heatmap[0, 0],
                                 [ctx_int, cty_int], radius)
@@ -258,9 +258,9 @@ class CTDetector(SingleStageDetector):
                 ct0 = ref_centers[idx]
                 ct = ref_centers[idx].clone()
 
-                ct[0] = ct[0] + random.random() * self.hm_disturb * ref_w
-                ct[1] = ct[1] + random.random() * self.hm_disturb * ref_h
-                conf = 1 if random.random() > self.lost_disturb else 0
+                ct[0] = ct[0] + torch.randn(1,device=img.device) * self.hm_disturb * ref_w
+                ct[1] = ct[1] + torch.randn(1,device=img.device) * self.hm_disturb * ref_h
+                conf = 1 if torch.randn(1,device=img.device) > self.lost_disturb else 0
 
                 ct_int = ct.int()
                 if conf == 0:
@@ -268,10 +268,10 @@ class CTDetector(SingleStageDetector):
 
                 gen_gaussian_target(pre_hm[batch_id, 0], ct_int, radius, k=conf)
 
-                if random.random() < self.fp_disturb:
+                if torch.randn(1) < self.fp_disturb:
                     ct2 = ct0.clone()
-                    ct2[0] = ct2[0] + random.random() * 0.05 * ref_w
-                    ct2[1] = ct2[1] + random.random() * 0.05 * ref_h
+                    ct2[0] = ct2[0] + torch.randn(1,device=img.device) * 0.05 * ref_w
+                    ct2[1] = ct2[1] + torch.randn(1,device=img.device) * 0.05 * ref_h
                     ct2_int = ct2.int()
                     gen_gaussian_target(pre_hm[batch_id, 0], ct2_int, radius, k=conf)
 

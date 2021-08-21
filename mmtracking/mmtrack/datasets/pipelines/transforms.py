@@ -845,20 +845,18 @@ class SeqRandomCenterCropPad(object):
         #     ct[0] += img_size * np.clip(np.random.randn() * cf, -2 * cf, 2 * cf)
         #     ct[1] += img_size * np.clip(np.random.randn() * cf, -2 * cf, 2 * cf)
         #     aug_s = np.clip(np.random.randn() * sf + 1, 1 - sf, 1 + sf)
-
+        new_h = int(self.crop_size[0])
+        new_w = int(self.crop_size[1])
         while True:
             # print('in while')
-            aug_scale = np.random.choice(self.ratios)
             h_border = self._get_border(self.border, h)
             w_border = self._get_border(self.border, w)
-
-            new_h = int(self.crop_size[0])
-            new_w = int(self.crop_size[1])
 
             for i in range(50):
                 all_bboxes_t = copy.deepcopy(all_bboxes)
                 ct[0] = np.random.randint(low=w_border, high=w - w_border)
                 ct[1] = np.random.randint(low=h_border, high=h - h_border)
+                aug_scale = np.random.choice(self.ratios)
                 size_t = img_size * aug_scale
 
                 trans_input = self._get_affine_transform(
@@ -900,7 +898,7 @@ class SeqRandomCenterCropPad(object):
                         mask[i] = True
                     # masks.append(mask)
                     # if image do not have valid bbox, any crop patch is valid.
-                    if not mask.any() and len(bboxes_t) > 0:
+                    if not mask.any() :
                         has_bbox = False
                         cropped_imgs.clear()
                         # masks.clear()
