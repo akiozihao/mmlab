@@ -85,7 +85,7 @@ data_root = '../data/mot17-frcnn/'
 # data_root = '/home/akio/data/MOT/MOT17-mini/'
 data = dict(
     samples_per_gpu=8,
-    workers_per_gpu=2,
+    workers_per_gpu=0,
     train=dict(
         _delete_=True,
         type='RepeatDataset',
@@ -118,7 +118,7 @@ model = dict(
     pretrains=dict(
         # detector='/home/akio/Downloads/new_crowdhuman.pth'
         # detector = '/home/akio/dev/centertrack_origin/models/crowdhuman.pth'
-        # detector='/home/akio/dev/mmlab/models/new_model.pth'
+        detector='/home/akio/dev/mmlab/models/new_model.pth'
         # detector='/home/akio/dev/mmlab/models/4_epoch_5.pth'
     ),
     detector=dict(
