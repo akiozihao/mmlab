@@ -84,7 +84,7 @@ test_pipeline = [
 data_root = '../data/mot17-frcnn/'
 # data_root = '/home/akio/data/MOT/MOT17-mini/'
 data = dict(
-    samples_per_gpu=8,
+    samples_per_gpu=4,
     workers_per_gpu=0,
     train=dict(
         _delete_=True,
@@ -150,7 +150,7 @@ model = dict(
 )
 
 # optimizer
-optimizer = dict(_delete_=True, type='Adam', lr=1.25e-4 / 8)
+optimizer = dict(_delete_=True, type='Adam', lr=1.25e-4 / 2)
 # optimizer_config = dict(grad_clip=None)
 # optimizer_config = dict(
 #     _delete_=True, grad_clip=dict(max_norm=35, norm_type=2))
