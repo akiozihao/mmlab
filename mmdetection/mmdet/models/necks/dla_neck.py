@@ -1,7 +1,7 @@
 import math
 
 import numpy as np
-from CenterTrack.src.lib.model.networks.DCNv2.dcn_v2 import DCN
+# from CenterTrack.src.lib.model.networks.DCNv2.dcn_v2 import DCN
 from mmcv.cnn import ConvModule
 from mmcv.cnn import build_conv_layer
 from mmcv.runner import BaseModule
