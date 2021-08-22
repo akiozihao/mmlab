@@ -801,7 +801,7 @@ class SeqPhotoMetricDistortion(object):
 
 
 @PIPELINES.register_module()
-class SeqRandomCenterCropPad(object):
+class SeqRandomCenterAffine(object):
 
     def __init__(self,
                  crop_size=(544, 960),
