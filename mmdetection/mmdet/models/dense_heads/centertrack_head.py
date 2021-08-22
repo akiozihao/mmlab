@@ -151,7 +151,6 @@ class CenterTrackHead(BaseModule):
 
         for s in range(self.num_stacks):
             output = outputs[s]
-            output = self._sigmoid_output(output)
 
             if 'hm' in output:
                 losses['hm'] += self.crit(
