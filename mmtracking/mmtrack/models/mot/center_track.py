@@ -68,30 +68,12 @@ class CenterTrack(BaseMultiObjectTracker):
     def simple_test(self,
                     img,
                     img_metas,
-                    rescale=False,
                     public_bboxes=None,  # todo check
                     **kwargs):
-        """Test without augmentations.
-
-        Args:
-            img (Tensor): of shape (N, C, H, W) encoding input images.
-                Typically these should be mean centered and std scaled.
-            img_metas (list[dict]): list of image info dict where each dict
-                has: 'img_shape', 'scale_factor', 'flip', and may also contain
-                'filename', 'ori_shape', 'pad_shape', and 'img_norm_cfg'.
-            rescale (bool, optional): If False, then returned bboxes and masks
-                will fit the scale of img, otherwise, returned bboxes and masks
-                will fit the scale of original image shape. Defaults to False.
-            public_bboxes (list[Tensor], optional): Public bounding boxes from
-                the benchmark. Defaults to None.
-
-        Returns:
-            dict[str : list(ndarray)]: The tracking results.
-        """
         frame_id = img_metas[0]['frame_id']
-        self.pre_bboxes_input = self.tracker.bboxes_input
-        if self.pre_bboxes_input is not None:
-            self.pre_bboxes_input = self.pre_bboxes_input[self.pre_bboxes_input[:, -1] > self.pre_thresh]
+        pre_bboxes_input = self.tracker.bboxes_input
+        if pre_bboxes_input is not None:
+            pre_bboxes_input = pre_bboxes_input[pre_bboxes_input[:, -1] > self.pre_thresh]
         if frame_id == 0:
             self.tracker.reset()
             self.ref_img = img.clone()
@@ -103,11 +85,11 @@ class CenterTrack(BaseMultiObjectTracker):
                 self.ref_img = None
         else:
             if self.use_pre_hm:
-                if self.pre_bboxes_input is None or self.pre_bboxes_input.shape[0] == 0:
+                if pre_bboxes_input is None or pre_bboxes_input.shape[0] == 0:
                     n, c, h, w = img.shape
                     self.ref_hm = torch.zeros((n, 1, h, w), dtype=img.dtype, device=img.device)
                 else:
-                    self.ref_hm = self.detector._build_test_hm(self.ref_img, self.pre_bboxes_input)
+                    self.ref_hm = self.detector._build_test_hm(self.ref_img, pre_bboxes_input)
             else:
                 self.ref_hm = None
                 self.ref_img = None
@@ -125,7 +107,7 @@ class CenterTrack(BaseMultiObjectTracker):
         outs = [center_heatmap_pred, wh_pred, offset_pred, tracking_pred, ltrb_amodal_pred]
         result_list = self.detector.bbox_head.get_bboxes(
             # todo Are outs always tensors?
-            *[[tensor] for tensor in outs], img_metas=img_metas, rescale=rescale)
+            *[[tensor] for tensor in outs], img_metas=img_metas)
         # TODO: support batch inference
         det_bboxes = result_list[0][0]
         det_labels = result_list[0][1]
@@ -140,9 +122,7 @@ class CenterTrack(BaseMultiObjectTracker):
             bboxes=det_bboxes,
             bboxes_with_motion=det_bboxes_with_motion,
             labels=det_labels,
-            frame_id=frame_id,
-            rescale=rescale,
-            **kwargs)
+            frame_id=frame_id)
         track_result = track2result(bboxes, labels, ids, num_classes)
         bbox_result = bbox2result(det_bboxes, det_labels, num_classes)
         return dict(bbox_results=bbox_result, track_results=track_result)
