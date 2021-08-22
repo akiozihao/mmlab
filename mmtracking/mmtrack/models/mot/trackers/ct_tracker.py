@@ -21,9 +21,7 @@ class CTTracker(BaseTracker):
               bboxes,
               bboxes_with_motion,
               labels,
-              frame_id,
-              rescale,
-              **kwargs):
+              frame_id):
         valid_inds = bboxes[:, -1] > self.obj_score_thr
         bboxes_input = bboxes_input[valid_inds]
         bboxes = bboxes[valid_inds]
