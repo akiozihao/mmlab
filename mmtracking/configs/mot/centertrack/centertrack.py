@@ -20,15 +20,9 @@ train_pipeline = [
     dict(type='SeqLoadAnnotations', with_bbox=True, with_track=True),
     dict(type='SeqPhotoMetricDistortion', share_params=True),
     dict(
-        type='SeqRandomCenterCropPad',
-        share_params=True,
+        type='SeqRandomCenterAffine',
         crop_size=(544, 960),
-        ratios=(0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3),
-        mean=[0, 0, 0],
-        std=[1, 1, 1],
-        to_rgb=True,
-        test_pad_mode=None,
-        bbox_clip_border=False),
+        ratios=(0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3)),
     dict(
         type='SeqResize',
         img_scale=(544, 960),
@@ -56,27 +50,15 @@ test_pipeline = [
         flip=False,
         transforms=[
             dict(
-                type='RandomCenterCropPad',
-                ratios=None,
-                border=None,
-                mean=[0, 0, 0],
-                std=[1, 1, 1],
-                to_rgb=True,
-                test_mode=True,
-                # test_pad_mode=['logical_or', 31],
-                # test_pad_add_pix=1,
-                test_pad_mode=['size_divisor', 32],
-                bbox_clip_border=False),
-            dict(type='Resize', keep_ratio=True, bbox_clip_border=False),
-            dict(type='RandomFlip'),
+                type='SeqRandomCenterAffine',
+                test_mode=True),
             dict(type='Normalize', **img_norm_cfg),
-            dict(type='Pad', size_divisor=32),
             dict(type='ImageToTensor', keys=['img']),
             dict(
                 type='VideoCollect',
                 meta_keys=('filename', 'ori_shape', 'img_shape', 'pad_shape',
                            'scale_factor', 'flip', 'flip_direction',
-                           'img_norm_cfg', 'border'),
+                           'img_norm_cfg','invert_transform'),
                 keys=['img'])
         ])
 ]
