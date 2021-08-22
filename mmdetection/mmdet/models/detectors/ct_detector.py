@@ -89,46 +89,6 @@ class CTDetector(SingleStageDetector):
         losses = self.bbox_head.forward_train(x, batch)
         return losses
 
-    # def _build_ref_hm(self, gt_bboxes, gt_labels, img_shape):
-    #     batch_size, _, img_h, img_w = img_shape
-    #
-    #     heatmap = gt_bboxes[-1].new_zeros([batch_size, self.bbox_head.num_classes, img_h, img_w])
-    #
-    #     for batch_id in range(batch_size):
-    #         gt_bbox = gt_bboxes[batch_id].clone()
-    #         # clip
-    #         gt_bbox[:, [0, 2]] = torch.clip(gt_bbox[:, [0, 2]], 0, img_w - 1)
-    #         gt_bbox[:, [1, 3]] = torch.clip(gt_bbox[:, [1, 3]], 0, img_h - 1)
-    #         gt_label = gt_labels[batch_id]
-    #         center_x = (gt_bbox[:, [0]] + gt_bbox[:, [2]]) / 2
-    #         center_y = (gt_bbox[:, [1]] + gt_bbox[:, [3]]) / 2
-    #         gt_centers = torch.cat((center_x, center_y), dim=1)
-    #
-    #         for j, ct in enumerate(gt_centers):
-    #             box_h = (gt_bbox[j][3] - gt_bbox[j][1])
-    #             box_w = (gt_bbox[j][2] - gt_bbox[j][0])
-    #             if box_w <= 0 or box_h <= 0:
-    #                 continue
-    #
-    #             radius = gaussian_radius([torch.ceil(box_h), torch.ceil(box_w)])
-    #             radius = max(0, int(radius))
-    #             ind = gt_label[j]
-    #
-    #             ct[0] = ct[0] + random.random() * self.hm_disturb * box_w
-    #             ct[1] = ct[1] + random.random() * self.hm_disturb * box_h
-    #             ctx_int, cty_int = ct.int()
-    #             gen_gaussian_target(heatmap[batch_id, ind],
-    #                                 [ctx_int, cty_int], radius)
-    #
-    #             if random.random() < self.fp_disturb:
-    #                 ct2 = ct.clone()
-    #                 ct2[0] = ct2[0] + random.random() * 0.05 * box_w
-    #                 ct2[1] = ct2[1] + random.random() * 0.05 * box_h
-    #                 ctx2_int, cty2_int = ct2.int()
-    #                 gen_gaussian_target(heatmap[0, 0],
-    #                                     [ctx2_int, cty2_int], radius)
-    #     return heatmap
-
     def _build_test_hm(self, ref_img, ref_bboxes):
         batch_size, _, img_h, img_w = ref_img.shape
         assert batch_size == 1
@@ -149,8 +109,8 @@ class CTDetector(SingleStageDetector):
             radius = gaussian_radius([scale_box_h, scale_box_w])  # check
             radius = max(0, int(radius))
 
-            ct[0] = torch.ceil(ct[0] + torch.randn(1,device=bboxes.device) * self.bbox_head.hm_disturb * scale_box_w)
-            ct[1] = torch.ceil(ct[1] + torch.randn(1,device=bboxes.device) * self.bbox_head.hm_disturb * scale_box_h)
+            # ct[0] = torch.ceil(ct[0] + torch.randn(1,device=bboxes.device) * self.bbox_head.hm_disturb * scale_box_w)
+            # ct[1] = torch.ceil(ct[1] + torch.randn(1,device=bboxes.device) * self.bbox_head.hm_disturb * scale_box_h)
             ctx_int, cty_int = ct.int()
             gen_gaussian_target(heatmap[0, 0],
                                 [ctx_int, cty_int], radius)
