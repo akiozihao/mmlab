@@ -15,8 +15,6 @@ class CTTracker(BaseTracker):
         self.obj_score_thr = obj_score_thr
 
     def track(self,
-              img,
-              img_metas,
               bboxes_input,
               bboxes,
               bboxes_with_motion,
