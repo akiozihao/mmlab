@@ -14,19 +14,20 @@ class CenterTrack(BaseMultiObjectTracker):
     def __init__(self,
                  detector=None,
                  tracker=None,
-                 pretrains=None,
+                 # pretrains=None,
                  pre_thresh=0.5,
                  use_pre_hm=True,
                  init_cfg=None
                  ):
         super(CenterTrack, self).__init__(init_cfg)
+        # todo detector and tracker should never be None
         if detector is not None:
             self.detector = build_detector(detector)
 
         if tracker is not None:
             self.tracker = build_tracker(tracker)
 
-        self.init_weights(pretrains)
+        # self.init_weights(pretrains)
         # self.init_module('detector', pretrain.get('detector', False))  # todo
         self.pre_thresh = pre_thresh
         self.use_pre_hm = use_pre_hm
@@ -35,17 +36,18 @@ class CenterTrack(BaseMultiObjectTracker):
         self.pre_hm = None
         self.pre_bboxes = None
 
-    def init_weights(self, pretrain=None):
-        """Initialize the weights of the modules.
+    # def init_weights(self, pretrain=None):
+    #     """Initialize the weights of the modules.
+    #
+    #     Args:
+    #         pretrained (dict): Path to pre-trained weights.
+    #     """
+    #     if pretrain is None:
+    #         pretrain = dict()
+    #     assert isinstance(pretrain, dict), '`pretrain` must be a dict.'
+    #     if self.with_detector and pretrain.get('detector', False):
+    #         self.init_module('detector', pretrain['detector'])
 
-        Args:
-            pretrained (dict): Path to pre-trained weights.
-        """
-        if pretrain is None:
-            pretrain = dict()
-        assert isinstance(pretrain, dict), '`pretrain` must be a dict.'
-        if self.with_detector and pretrain.get('detector', False):
-            self.init_module('detector', pretrain['detector'])
 
     def init_module(self, module_name, pretrain=None):
         """Initialize the weights of a sub-module.
