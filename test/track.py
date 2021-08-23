@@ -18,9 +18,9 @@ meta_path = '../tensors/meta.pt'
 opt_path = '../tensors/opt.pt'
 output1_path = '../tensors/head_output_1.pt'
 output2_path = '../tensors/head_output_1.pt'
-
 meta = torch.load(meta_path)
 opt = torch.load(opt_path)
+opt.out_thresh = 0.4
 output1 = torch.load(output1_path)
 output2 = torch.load(output2_path)
 
@@ -85,3 +85,5 @@ track_result = track2result(bboxes, labels, ids, num_classes)
 bbox_result = bbox2result(det_bboxes, det_labels, num_classes)
 # original
 results = detector.tracker.step(results, None)
+
+print('done track')
