@@ -116,8 +116,8 @@ class CenterTrack(BaseMultiObjectTracker):
         num_classes = self.detector.bbox_head.num_classes
         self.ref_img = img
         bboxes, labels, ids = self.tracker.track(
-            img=img,
-            img_metas=img_metas,
+            # img=img,
+            # img_metas=img_metas,
             bboxes_input=det_bboxes_input,
             bboxes=det_bboxes,
             bboxes_with_motion=det_bboxes_with_motion,
