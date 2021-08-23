@@ -5,7 +5,7 @@ from mmdet.models.necks.dla_neck import DLANeck
 
 from CenterTrack.src.lib.model.networks.dla import BasicBlock, DLA as DLA_Ori
 from CenterTrack.src.lib.model.networks.dla import DLASeg
-
+from head import _sigmoid,_sigmoid_output
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = True
 use_cuda = True
@@ -116,6 +116,7 @@ head_output_ori = {}
 for head_name in seg.heads:
     head_output_ori[head_name] = seg.__getattr__(head_name)(neck_out_ori)
 head_output_ori = [head_output_ori]
+head_output_ori[0] = _sigmoid_output(head_output_ori[0])
 for head_name in seg.heads:
     assert (head_output[0][head_name] == head_output_ori[0][head_name]).all(), f'{head_name} not match'
 
@@ -153,7 +154,7 @@ class GenericLoss(torch.nn.Module):
 
         for s in range(opt.num_stacks):
             output = outputs[s]
-            output = self._sigmoid_output(output)
+            # output = self._sigmoid_output(output)
 
             if 'hm' in output:
                 losses['hm'] += self.crit(
@@ -205,4 +206,4 @@ for k in loss_out.keys():
     assert (loss_out[k] == (opt.weights)[k[5:]] * loss_out_ori[
         k[5:]]).all(), f'Loss: {k} not match'
 
-print('done')
+print('done loss')

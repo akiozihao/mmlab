@@ -14,13 +14,19 @@ neck_path = '../mmpth/neck.pt'
 neck_path_ori = '/home/akio/Downloads/crowdhuman_split/neck.pt'
 opt_path = '/home/akio/Downloads/crowdhuman_split/opt.pt'
 head_path = '/home/akio/Downloads/crowdhuman_split/head.pt'
-# opt = Struct(**{'pre_img': True,
-#                 'pre_hm': True,
-#                 'head_kernel': 3,
-#                 'prior_bias': -4.6,
-#                 'dla_node': 'dcn',
-#                 'load_model': ''}
-#              )
+
+def _sigmoid(x):
+    y = torch.clamp(x.sigmoid_(), min=1e-4, max=1 - 1e-4)
+    return y
+def _sigmoid_output(output):
+    if 'hm' in output:
+        output['hm'] = _sigmoid(output['hm'])
+    if 'hm_hp' in output:
+        output['hm_hp'] = _sigmoid(output['hm_hp'])
+    if 'dep' in output:
+        output['dep'] = 1. / (output['dep'].sigmoid() + 1e-6) - 1.
+    return output
+
 opt = torch.load(opt_path)
 
 # input
@@ -53,7 +59,9 @@ heads = {
 }
 
 head = CenterTrackHead(
-    heads, head_convs, 1, 64,weights=dict(hm=1, reg=1, wh=0.1, tracking=1, ltrb_amodal=0.1)
+    heads, head_convs, 1, 64, weights=dict(hm=1, reg=1, wh=0.1, tracking=1, ltrb_amodal=0.1),
+    test_cfg=dict(topk=100, local_maximum_kernel=3, max_per_img=100),
+    train_cfg=dict(fp_disturb=0.1, lost_disturb=0.4, hm_disturb=0.05)
 )
 # init origin model
 seg = DLASeg(34, heads, head_convs, opt=opt)
@@ -107,6 +115,7 @@ head_output_ori = {}
 for head in seg.heads:
     head_output_ori[head] = seg.__getattr__(head)(neck_out_ori)
 head_output_ori = [head_output_ori]
+head_output_ori[0] = _sigmoid_output(head_output_ori[0])
 for head in seg.heads:
     assert (head_output[0][head] == head_output_ori[0][head]).all(), f'{head} not match'
-print('done')
+print('done head')
