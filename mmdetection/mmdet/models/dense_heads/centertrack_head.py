@@ -1,5 +1,3 @@
-from math import sqrt
-
 import torch
 import torch.nn.functional as F
 from mmcv.runner import BaseModule
@@ -37,29 +35,6 @@ def _only_neg_loss(pred, gt):
 def _sigmoid(x):
     y = torch.clamp(x.sigmoid_(), min=1e-4, max=1 - 1e-4)
     return y
-
-
-def gaussian_radius(det_size, min_overlap=0.7):
-    height, width = det_size
-
-    a1 = 1
-    b1 = (height + width)
-    c1 = width * height * (1 - min_overlap) / (1 + min_overlap)
-    sq1 = sqrt(b1 ** 2 - 4 * a1 * c1)
-    r1 = (b1 + sq1) / 2
-
-    a2 = 4
-    b2 = 2 * (height + width)
-    c2 = (1 - min_overlap) * width * height
-    sq2 = sqrt(b2 ** 2 - 4 * a2 * c2)
-    r2 = (b2 + sq2) / 2
-
-    a3 = 4 * min_overlap
-    b3 = -2 * min_overlap * (height + width)
-    c3 = (min_overlap - 1) * width * height
-    sq3 = sqrt(b3 ** 2 - 4 * a3 * c3)
-    r3 = (b3 + sq3) / 2
-    return min(r1, r2, r3)
 
 
 @HEADS.register_module()
@@ -194,11 +169,6 @@ class CenterTrackHead(BaseModule):
             nk = 'loss_' + k
             format_loss[nk] = v
         return format_loss
-        # losses['tot'] = 0
-        # for head in self.heads:
-        #     losses['tot'] += self.weights[head] * losses[head]
-        #
-        # return losses['tot'], losses
 
     def get_bboxes(self,
                    center_heatmap_preds,
@@ -221,16 +191,12 @@ class CenterTrackHead(BaseModule):
             k=self.test_cfg.topk,
             kernel=self.test_cfg.local_maximum_kernel)
         batch_det_bboxes_input = batch_det_bboxes.clone()
-        # batch_border = batch_det_bboxes.new_tensor(
-        #     border_pixs)[:, [2, 0, 2, 0]].unsqueeze(1)
-        # batch_det_bboxes[..., :4] -= batch_border
-        # batch_gt_bboxes_with_motion[..., :4] -= batch_border
         bs = batch_det_bboxes.shape[0]
         for batch_id in range(bs):
             batch_det_bboxes[batch_id, :, :2] = affine_transform(batch_det_bboxes[batch_id, :, :2],
                                                                  invert_transfrom[batch_id])
             batch_det_bboxes[batch_id, :, 2:-1] = affine_transform(batch_det_bboxes[batch_id, :, 2:-1],
-                                                                 invert_transfrom[batch_id])
+                                                                   invert_transfrom[batch_id])
             batch_gt_bboxes_with_motion[batch_id, :, :2] = affine_transform(
                 batch_gt_bboxes_with_motion[batch_id, :, :2],
                 invert_transfrom[batch_id])
@@ -304,7 +270,7 @@ class CenterTrackHead(BaseModule):
         if self.use_ltrb:
             tl_x = (topk_xs0 + ltrb[..., 0]) * (inp_w / width)
             tl_y = (topk_ys0 + ltrb[..., 1]) * (inp_h / height)
-            br_x = (topk_xs0+  ltrb[..., 2]) * (inp_w / width)
+            br_x = (topk_xs0 + ltrb[..., 2]) * (inp_w / width)
             br_y = (topk_ys0 + ltrb[..., 3]) * (inp_h / height)
             # ref bboxes
             with_motion_tl_x = (with_motion_topk_xs0 + ltrb[..., 0]) * (inp_w / width)
