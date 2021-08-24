@@ -20,12 +20,8 @@ class CenterTrack(BaseMultiObjectTracker):
                  init_cfg=None
                  ):
         super(CenterTrack, self).__init__(init_cfg)
-        # todo detector and tracker should never be None
-        if detector is not None:
-            self.detector = build_detector(detector)
-
-        if tracker is not None:
-            self.tracker = build_tracker(tracker)
+        self.detector = build_detector(detector)
+        self.tracker = build_tracker(tracker)
 
         # self.init_weights(pretrains)
         # self.init_module('detector', pretrain.get('detector', False))  # todo
@@ -34,38 +30,15 @@ class CenterTrack(BaseMultiObjectTracker):
 
         self.pre_img = None
         self.pre_hm = None
-        self.pre_bboxes = None
 
-    # def init_weights(self, pretrain=None):
-    #     """Initialize the weights of the modules.
-    #
-    #     Args:
-    #         pretrained (dict): Path to pre-trained weights.
-    #     """
-    #     if pretrain is None:
-    #         pretrain = dict()
-    #     assert isinstance(pretrain, dict), '`pretrain` must be a dict.'
-    #     if self.with_detector and pretrain.get('detector', False):
-    #         self.init_module('detector', pretrain['detector'])
+    def init_weights(self):
+        """Initialize the weights of the modules.
 
-
-    def init_module(self, module_name, pretrain=None):
-        """Initialize the weights of a sub-module.
         Args:
-            module (nn.Module): A sub-module of the model.
-            pretrained (str, optional): Path to pre-trained weights.
-                Defaults to None.
+            pretrained (dict): Path to pre-trained weights.
         """
-        module = getattr(self, module_name)
-        if pretrain is not None:
-            print_log(
-                f'load {module_name} from: {pretrain}', logger=self.logger)
-            checkpoint = load_checkpoint(
-                module, pretrain, strict=False, logger=self.logger)
-            if 'meta' in checkpoint and 'CLASSES' in checkpoint['meta']:
-                module.CLASSES = checkpoint['meta']['CLASSES']
-        else:
-            module.init_weights()
+        super(CenterTrack, self).init_weights()
+        self.detector.init_weights()
 
     def simple_test(self,
                     img,
