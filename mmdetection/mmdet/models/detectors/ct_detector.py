@@ -4,32 +4,32 @@ from math import sqrt
 
 import torch
 from mmdet.models.builder import DETECTORS
-from mmdet.models.utils import gen_gaussian_target
+from mmdet.models.utils import gen_gaussian_target,gaussian_radius
 
 from .single_stage import SingleStageDetector
 
 
-def gaussian_radius(det_size, min_overlap=0.7):
-    height, width = det_size
-
-    a1 = 1
-    b1 = (height + width)
-    c1 = width * height * (1 - min_overlap) / (1 + min_overlap)
-    sq1 = sqrt(b1 ** 2 - 4 * a1 * c1)
-    r1 = (b1 + sq1) / 2
-
-    a2 = 4
-    b2 = 2 * (height + width)
-    c2 = (1 - min_overlap) * width * height
-    sq2 = sqrt(b2 ** 2 - 4 * a2 * c2)
-    r2 = (b2 + sq2) / 2
-
-    a3 = 4 * min_overlap
-    b3 = -2 * min_overlap * (height + width)
-    c3 = (min_overlap - 1) * width * height
-    sq3 = sqrt(b3 ** 2 - 4 * a3 * c3)
-    r3 = (b3 + sq3) / 2
-    return min(r1, r2, r3)
+# def gaussian_radius(det_size, min_overlap=0.7):
+#     height, width = det_size
+#
+#     a1 = 1
+#     b1 = (height + width)
+#     c1 = width * height * (1 - min_overlap) / (1 + min_overlap)
+#     sq1 = sqrt(b1 ** 2 - 4 * a1 * c1)
+#     r1 = (b1 + sq1) / 2
+#
+#     a2 = 4
+#     b2 = 2 * (height + width)
+#     c2 = (1 - min_overlap) * width * height
+#     sq2 = sqrt(b2 ** 2 - 4 * a2 * c2)
+#     r2 = (b2 + sq2) / 2
+#
+#     a3 = 4 * min_overlap
+#     b3 = -2 * min_overlap * (height + width)
+#     c3 = (min_overlap - 1) * width * height
+#     sq3 = sqrt(b3 ** 2 - 4 * a3 * c3)
+#     r3 = (b3 + sq3) / 2
+#     return min(r1, r2, r3)
 
 
 @DETECTORS.register_module()
@@ -106,7 +106,7 @@ class CTDetector(SingleStageDetector):
             scale_box_w = (bboxes[j][2] - bboxes[j][0])
             if scale_box_h <= 0 or scale_box_w <= 0:
                 continue
-            radius = gaussian_radius([scale_box_h, scale_box_w])  # check
+            radius = gaussian_radius([torch.ceil(scale_box_h), torch.ceil(scale_box_w)],min_overlap=0.3)
             radius = max(0, int(radius))
 
             # ct[0] = torch.ceil(ct[0] + torch.randn(1,device=bboxes.device) * self.bbox_head.hm_disturb * scale_box_w)
@@ -212,7 +212,7 @@ class CTDetector(SingleStageDetector):
                 if ref_h <= 0 or ref_w <= 0:
                     continue
 
-                radius = gaussian_radius((math.ceil(ref_h), math.ceil(ref_w)))
+                radius = gaussian_radius([torch.ceil(ref_h), torch.ceil(ref_w)],min_overlap=0.3)
                 radius = max(0, int(radius))
 
                 ct0 = ref_centers[idx]
