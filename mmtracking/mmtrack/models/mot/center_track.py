@@ -31,14 +31,14 @@ class CenterTrack(BaseMultiObjectTracker):
         self.pre_img = None
         self.pre_hm = None
 
-    def init_weights(self):
-        """Initialize the weights of the modules.
-
-        Args:
-            pretrained (dict): Path to pre-trained weights.
-        """
-        super(CenterTrack, self).init_weights()
-        self.detector.init_weights()
+    # def init_weights(self):
+    #     """Initialize the weights of the modules.
+    #
+    #     Args:
+    #         pretrained (dict): Path to pre-trained weights.
+    #     """
+    #     super(CenterTrack, self).init_weights()
+    #     self.detector.init_weights()
 
     def simple_test(self,
                     img,
