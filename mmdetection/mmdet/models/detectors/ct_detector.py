@@ -8,30 +8,6 @@ from mmdet.models.utils import gen_gaussian_target,gaussian_radius
 
 from .single_stage import SingleStageDetector
 
-
-# def gaussian_radius(det_size, min_overlap=0.7):
-#     height, width = det_size
-#
-#     a1 = 1
-#     b1 = (height + width)
-#     c1 = width * height * (1 - min_overlap) / (1 + min_overlap)
-#     sq1 = sqrt(b1 ** 2 - 4 * a1 * c1)
-#     r1 = (b1 + sq1) / 2
-#
-#     a2 = 4
-#     b2 = 2 * (height + width)
-#     c2 = (1 - min_overlap) * width * height
-#     sq2 = sqrt(b2 ** 2 - 4 * a2 * c2)
-#     r2 = (b2 + sq2) / 2
-#
-#     a3 = 4 * min_overlap
-#     b3 = -2 * min_overlap * (height + width)
-#     c3 = (min_overlap - 1) * width * height
-#     sq3 = sqrt(b3 ** 2 - 4 * a3 * c3)
-#     r3 = (b3 + sq3) / 2
-#     return min(r1, r2, r3)
-
-
 @DETECTORS.register_module()
 class CTDetector(SingleStageDetector):
     def __init__(self,
@@ -75,7 +51,7 @@ class CTDetector(SingleStageDetector):
         bs, _, img_h, img_w = ref_img.shape
         pre_hm = ref_bboxes[-1].new_zeros([bs, 1, img_h, img_w])
         for batch_id in range(bs):
-            ref_bbox = ref_bboxes[batch_id]
+            ref_bbox = ref_bboxes[batch_id].clone()
             ref_bbox[:, [0, 2]] = torch.clip(ref_bbox[:, [0, 2]], 0, img_w - 1)
             ref_bbox[:, [1, 3]] = torch.clip(ref_bbox[:, [1, 3]], 0, img_h - 1)
             # clipped ref centers
@@ -103,8 +79,8 @@ class CTDetector(SingleStageDetector):
                 # disturb ref_bboxes
                 if conf == 0:
                     # ref_centers[idx] = ct
-                    ref_bbox[idx,[0,2]] += ct[0] - ct0[0]
-                    ref_bbox[idx,[1,3]] += ct[1] - ct0[1]
+                    ref_bboxes[batch_id][idx,[0,2]] += ct[0] - ct0[0]
+                    ref_bboxes[batch_id][idx,[1,3]] += ct[1] - ct0[1]
                 gen_gaussian_target(pre_hm[batch_id, 0], ct_int, radius, k=conf)
 
                 if torch.rand(1) < self.fp_disturb:

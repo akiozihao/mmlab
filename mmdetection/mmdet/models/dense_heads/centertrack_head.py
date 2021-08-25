@@ -230,18 +230,14 @@ class CenterTrackHead(BaseModule):
             scale_ref_bbox = ref_gt_bboxes[batch_id].clone()
             scale_ref_bbox[:, [0, 2]] = torch.clip(scale_ref_bbox[:, [0, 2]] * width_ratio, 0, feat_w - 1)
             scale_ref_bbox[:, [1, 3]] = torch.clip(scale_ref_bbox[:, [1, 3]] * height_ratio, 0, feat_h - 1)
-            # clipped ref bbox
-            ref_bbox = ref_gt_bboxes[batch_id].clone()
-            ref_bbox[:, [0, 2]] = torch.clip(ref_bbox[:, [0, 2]], 0, img_w - 1)
-            ref_bbox[:, [1, 3]] = torch.clip(ref_bbox[:, [1, 3]], 0, img_h - 1)
             # centers
             # clipped scale gt centers
             scale_gt_center_x = (scale_gt_bbox[:, [0]] + scale_gt_bbox[:, [2]]) / 2
             scale_gt_center_y = (scale_gt_bbox[:, [1]] + scale_gt_bbox[:, [3]]) / 2
             # clipped ref centers
-            ref_center_x = (ref_bbox[:, [0]] + ref_bbox[:, [2]]) / 2
-            ref_center_y = (ref_bbox[:, [1]] + ref_bbox[:, [3]]) / 2
-            ref_centers = torch.cat((ref_center_x, ref_center_y), dim=1)
+            scale_ref_center_x = (scale_ref_bbox[:, [0]] + scale_ref_bbox[:, [2]]) / 2
+            scale_ref_center_y = (scale_ref_bbox[:, [1]] + scale_ref_bbox[:, [3]]) / 2
+            scale_ref_centers = torch.cat((scale_ref_center_x, scale_ref_center_y), dim=1)
             # labels
             gt_label = gt_labels[batch_id]
 
@@ -281,9 +277,9 @@ class CenterTrackHead(BaseModule):
                     if scale_ref_h <= 0 or scale_ref_w <= 0:
                         continue
                     else:
-                        ref_ctx, ref_cty = ref_centers[idx]
-                        tracking_target[batch_id, 0, cty_int, ctx_int] = ref_ctx * width_ratio - ctx_int
-                        tracking_target[batch_id, 1, cty_int, ctx_int] = ref_cty * height_ratio - cty_int
+                        ref_ctx, ref_cty = scale_ref_centers[idx]
+                        tracking_target[batch_id, 0, cty_int, ctx_int] = ref_ctx - ctx_int
+                        tracking_target[batch_id, 1, cty_int, ctx_int] = ref_cty - cty_int
                         tracking_target_weight[batch_id, :, cty_int, ctx_int] = 1
 
         targets['center_heatmap_target'] = center_heatmap_target
