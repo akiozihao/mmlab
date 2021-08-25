@@ -1,162 +1,110 @@
 import torch
-import torch.nn.functional as F
-from mmcv.runner import BaseModule
 from mmdet.models import HEADS, build_loss
+from mmdet.models.dense_heads.centernet_head import CenterNetHead
 from mmdet.models.utils.gaussian_target import get_local_maximum, get_topk_from_heatmap, transpose_and_gather_feat, \
     gaussian_radius, gen_gaussian_target
 from torch import nn
 
 
-def affine_transform(pt, t):
-    new_pt = torch.cat((pt, pt.new_ones(pt.shape[0], 1)), axis=1)
-    new_pt = torch.matmul(new_pt, torch.tensor(t, dtype=pt.dtype, device=pt.device).T)
-    return new_pt
-
-
-def _gather_feat(feat, ind):
-    dim = feat.size(2)
-    ind = ind.unsqueeze(2).expand(ind.size(0), ind.size(1), dim)
-    feat = feat.gather(1, ind)
-    return feat
-
-
-def fill_fc_weights(layers):
-    for m in layers.modules():
-        if isinstance(m, nn.Conv2d):
-            if m.bias is not None:
-                nn.init.constant_(m.bias, 0)
-
-
-def _only_neg_loss(pred, gt):
-    gt = torch.pow(1 - gt, 4)
-    neg_loss = torch.log(1 - pred) * torch.pow(pred, 2) * gt
-    return neg_loss.sum()
-
-
-def _sigmoid(x):
-    y = torch.clamp(x.sigmoid_(), min=1e-4, max=1 - 1e-4)
-    return y
-
-
 @HEADS.register_module()
-class CenterTrackHead(BaseModule):
+class CenterTrackHead(CenterNetHead):
     def __init__(self,
-                 heads, head_convs, num_stacks, last_channel, weights,
+                 in_channel,
+                 feat_channel,
+                 num_classes=1,
+                 use_ltrb=True,
+                 # heads, head_convs, num_stacks, last_channel, weights,
                  loss_center_heatmap=dict(type='GaussianFocalLoss', loss_weight=1.0),
                  loss_offset=dict(type='L1Loss', loss_weight=1.0),
                  loss_wh=dict(type='L1Loss', loss_weight=0.1),
                  loss_tracking=dict(type='L1Loss', loss_weight=1.0),
                  loss_ltrb_amodal=dict(type='L1Loss', loss_weight=0.1),
-                 init_cfg=None, train_cfg=None, test_cfg=None):
-        super(CenterTrackHead, self).__init__(init_cfg)
-        self.use_ltrb = True
+                 init_cfg=None,
+                 train_cfg=None,
+                 test_cfg=None):
+        super(CenterTrackHead, self).__init__(in_channel, feat_channel, num_classes,
+                                              init_cfg=init_cfg,
+                                              train_cfg=train_cfg,
+                                              test_cfg=test_cfg, )
+        self.use_ltrb = use_ltrb
         self.test_cfg = test_cfg
         self.fp_disturb = train_cfg['fp_disturb']
         self.hm_disturb = train_cfg['hm_disturb']
         self.lost_disturb = train_cfg['lost_disturb']
-        self.crit = FastFocalLoss()
-        self.crit_reg = RegWeightedL1Loss()
-        head_kernel = 3
-        self.num_stacks = num_stacks
-        self.heads = heads
-        self.weights = weights
-        self.num_classes = 1
-        for head in self.heads:
-            classes = self.heads[head]
-            head_conv = head_convs[head]
-            if len(head_conv) > 0:
-                out = nn.Conv2d(head_conv[-1], classes,
-                                kernel_size=1, stride=1, padding=0, bias=True)
-                conv = nn.Conv2d(last_channel, head_conv[0],
-                                 kernel_size=head_kernel,
-                                 padding=head_kernel // 2, bias=True)
-                convs = [conv]
-                for k in range(1, len(head_conv)):
-                    convs.append(nn.Conv2d(head_conv[k - 1], head_conv[k],
-                                           kernel_size=1, bias=True))
-                if len(convs) == 1:
-                    fc = nn.Sequential(conv, nn.ReLU(inplace=True), out)
-                elif len(convs) == 2:
-                    fc = nn.Sequential(
-                        convs[0], nn.ReLU(inplace=True),
-                        convs[1], nn.ReLU(inplace=True), out)
-                elif len(convs) == 3:
-                    fc = nn.Sequential(
-                        convs[0], nn.ReLU(inplace=True),
-                        convs[1], nn.ReLU(inplace=True),
-                        convs[2], nn.ReLU(inplace=True), out)
-                elif len(convs) == 4:
-                    fc = nn.Sequential(
-                        convs[0], nn.ReLU(inplace=True),
-                        convs[1], nn.ReLU(inplace=True),
-                        convs[2], nn.ReLU(inplace=True),
-                        convs[3], nn.ReLU(inplace=True), out)
-                if 'hm' in head:
-                    fc[-1].bias.data.fill_(-4.6)
-                else:
-                    fill_fc_weights(fc)
-            else:
-                fc = nn.Conv2d(last_channel, classes,
-                               kernel_size=1, stride=1, padding=0, bias=True)
-                if 'hm' in head:
-                    fc.bias.data.fill_(-4.6)
-                else:
-                    fill_fc_weights(fc)
-            self.__setattr__(head, fc)
 
-        self.loss_center_heatmap = build_loss(loss_center_heatmap)
-        self.loss_offset = build_loss(loss_offset)
-        self.loss_wh = build_loss(loss_wh)
+        self.ltrb_amodal_head = self._build_head(in_channel, feat_channel, 4)
+        self.tracking_head = self._build_head(in_channel, feat_channel, 2)
+
         self.loss_tracking = build_loss(loss_tracking)
         self.loss_ltrb_amodal = build_loss(loss_ltrb_amodal)
 
-    def forward(self, feats):
-        outs = []
-        for s in range(self.num_stacks):
-            z = {}
-            for head in self.heads:
-                z[head] = self.__getattr__(head)(feats[s])
-            z = self._sigmoid_output(z)
-            outs.append(z)
-        return outs
+    def _affine_transform(self, pts, t):
+        new_pts = torch.cat((pts, pts.new_ones(pts.shape[0], 1)), axis=1)
+        new_pts = torch.matmul(new_pts, torch.tensor(t, dtype=pts.dtype, device=pts.device).T)
+        return new_pts
+
+    def _smooth_sigmoid(self, x):
+        y = torch.clamp(x.sigmoid_(), min=1e-4, max=1 - 1e-4)
+        return y
+
+    def forward(self, feat):
+        center_heatmap_pred = self._smooth_sigmoid(self.heatmap_head(feat))
+        wh_pred = self.wh_head(feat)
+        offset_pred = self.offset_head(feat)
+        ltrb_amodal_pred = self.ltrb_amodal_head(feat)
+        tracking_pred = self.tracking_head(feat)
+        return dict(
+            center_heatmap_pred=center_heatmap_pred,
+            wh_pred=wh_pred,
+            offset_pred=offset_pred,
+            ltrb_amodal_pred=ltrb_amodal_pred,
+            tracking_pred=tracking_pred
+        )
 
     def forward_train(self, x, gt_amodal_bboxes, gt_labels, feat_shape, img_shape, gt_match_indices, ref_bboxes):
         outs = self(x)
         loss = self.loss(outs, gt_amodal_bboxes, gt_labels, feat_shape, img_shape, gt_match_indices, ref_bboxes)
         return loss
 
-    # todo ximi
-    def _sigmoid_output(self, output):
-        if 'hm' in output:
-            output['hm'] = _sigmoid(output['hm'])
-        if 'hm_hp' in output:
-            output['hm_hp'] = _sigmoid(output['hm_hp'])
-        if 'dep' in output:
-            output['dep'] = 1. / (output['dep'].sigmoid() + 1e-6) - 1.
-        return output
+    def init_weights(self):
+        """Initialize weights of the head."""
+        bias_init = bias_init_with_prob(0.1)
+        self.heatmap_head[-1].bias.data.fill_(bias_init)
+        for head in [self.wh_head, self.offset_head]:
+            for m in head.modules():
+                if isinstance(m, nn.Conv2d):
+                    normal_init(m, std=0.001)
+
+    def _build_head(self, in_channel, feat_channel, out_channel):
+        """Build head for each branch."""
+        layer = nn.Sequential(
+            nn.Conv2d(in_channel, feat_channel, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(feat_channel, out_channel, kernel_size=1))
+        return layer
 
     def loss(self, outputs, gt_amodal_bboxes, gt_labels, feat_shape, img_shape, gt_match_indices, ref_bboxes):
         targets = self.get_targets(gt_amodal_bboxes, gt_labels, feat_shape, img_shape, gt_match_indices, ref_bboxes)
-        outputs = outputs[0]
-
-        center_heatmap_pred = outputs['hm']
-        offset_pred = outputs['reg']
-        wh_pred = outputs['wh']
-        tracking_pred = outputs['tracking']
-        ltrb_amodal_pred = outputs['ltrb_amodal']
-
+        outputs = outputs
+        # predict
+        center_heatmap_pred = outputs['center_heatmap_pred']
+        wh_pred = outputs['wh_pred']
+        offset_pred = outputs['offset_pred']
+        ltrb_amodal_pred = outputs['ltrb_amodal_pred']
+        tracking_pred = outputs['tracking_pred']
+        # target
         center_heatmap_target = targets['center_heatmap_target']
-        offset_target = targets['offset_target']
         wh_target = targets['wh_target']
-        tracking_target = targets['tracking_target']
+        offset_target = targets['offset_target']
         ltrb_amodal_target = targets['ltrb_amodal_target']
-
+        tracking_target = targets['tracking_target']
+        # weight
         wh_offset_target_weight = targets['wh_offset_target_weight']
         ltrb_amodal_target_weight = targets['ltrb_amodal_target_weight']
         tracking_target_weight = targets['tracking_target_weight']
-
+        # avg factor
         avg_factor = targets['avg_factor']
-
+        # loss
         loss_center_heatmap = self.loss_center_heatmap(
             center_heatmap_pred,
             center_heatmap_target,
@@ -301,14 +249,14 @@ class CenterTrackHead(BaseModule):
         batch_det_bboxes_input = batch_det_bboxes.clone()
         bs = batch_det_bboxes.shape[0]
         for batch_id in range(bs):
-            batch_det_bboxes[batch_id, :, :2] = affine_transform(batch_det_bboxes[batch_id, :, :2],
-                                                                 invert_transfrom[batch_id])
-            batch_det_bboxes[batch_id, :, 2:-1] = affine_transform(batch_det_bboxes[batch_id, :, 2:-1],
-                                                                   invert_transfrom[batch_id])
-            batch_gt_bboxes_with_motion[batch_id, :, :2] = affine_transform(
+            batch_det_bboxes[batch_id, :, :2] = self._affine_transform(batch_det_bboxes[batch_id, :, :2],
+                                                                       invert_transfrom[batch_id])
+            batch_det_bboxes[batch_id, :, 2:-1] = self._affine_transform(batch_det_bboxes[batch_id, :, 2:-1],
+                                                                         invert_transfrom[batch_id])
+            batch_gt_bboxes_with_motion[batch_id, :, :2] = self._affine_transform(
                 batch_gt_bboxes_with_motion[batch_id, :, :2],
                 invert_transfrom[batch_id])
-            batch_gt_bboxes_with_motion[batch_id, :, 2:-1] = affine_transform(
+            batch_gt_bboxes_with_motion[batch_id, :, 2:-1] = self._affine_transform(
                 batch_gt_bboxes_with_motion[batch_id, :, 2:-1],
                 invert_transfrom[batch_id])
 
@@ -405,51 +353,3 @@ class CenterTrackHead(BaseModule):
         with_motion_batch_bboxes = torch.cat((with_motion_batch_bboxes, batch_scores[..., None]),
                                              dim=-1)
         return batch_bboxes, batch_topk_labels, with_motion_batch_bboxes
-
-
-class FastFocalLoss(nn.Module):
-    '''
-    Reimplemented focal loss, exactly the same as the CornerNet version.
-    Faster and costs much less memory.
-    '''
-
-    def __init__(self, opt=None):
-        super(FastFocalLoss, self).__init__()
-        self.only_neg_loss = _only_neg_loss
-
-    def forward(self, out, target, ind, mask, cat):
-        '''
-        Arguments:
-          out, target: B x C x H x W
-          ind, mask: B x M
-          cat (category id for peaks): B x M
-        '''
-        neg_loss = self.only_neg_loss(out, target)
-        pos_pred_pix = _tranpose_and_gather_feat(out, ind)  # B x M x C
-        pos_pred = pos_pred_pix.gather(2, cat.unsqueeze(2))  # B x M
-        num_pos = mask.sum()
-        pos_loss = torch.log(pos_pred) * torch.pow(1 - pos_pred, 2) * \
-                   mask.unsqueeze(2)
-        pos_loss = pos_loss.sum()
-        if num_pos == 0:
-            return - neg_loss
-        return - (pos_loss + neg_loss) / num_pos
-
-
-class RegWeightedL1Loss(nn.Module):
-    def __init__(self):
-        super(RegWeightedL1Loss, self).__init__()
-
-    def forward(self, output, mask, ind, target):
-        pred = _tranpose_and_gather_feat(output, ind)
-        # loss = F.l1_loss(pred * mask, target * mask, reduction='elementwise_mean')
-        loss = F.l1_loss(pred * mask, target * mask, reduction='sum')
-        loss = loss / (mask.sum() + 1e-4)
-        return loss
-
-
-def _tranpose_and_gather_feat(feat, ind):
-    feat = feat.permute(0, 2, 3, 1).contiguous()
-    feat = feat.view(feat.size(0), -1, feat.size(3))
-    feat = _gather_feat(feat, ind)
-    return feat

@@ -4,10 +4,10 @@ import numpy as np
 # from CenterTrack.src.lib.model.networks.DCNv2.dcn_v2 import DCN
 from mmcv.cnn import ConvModule
 from mmcv.cnn import build_conv_layer
+from mmcv.ops import ModulatedDeformConv2dPack
 from mmcv.runner import BaseModule
 from mmdet.models.builder import NECKS
 from torch import nn
-from mmcv.ops import ModulatedDeformConv2dPack
 
 
 # class DeformConv(nn.Module):
@@ -218,4 +218,4 @@ class DLANeck(BaseModule):
             y.append(x[i].clone())
         self.ida_up(y, 0, len(y))
 
-        return [y[-1]]
+        return y[-1]

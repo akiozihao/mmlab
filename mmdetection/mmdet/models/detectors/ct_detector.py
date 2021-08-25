@@ -37,10 +37,11 @@ class CTDetector(SingleStageDetector):
                       gt_match_indices,
                       ref_img,
                       ref_amodal_bboxes):
-        ref_hm,ref_bboxes = self._build_ref_hm_update_ref_bboxes(ref_img, ref_amodal_bboxes)
+        ref_hm, ref_bboxes = self._build_ref_hm_update_ref_bboxes(ref_img, ref_amodal_bboxes)
         x = self.backbone(img, ref_img, ref_hm)
         x = self.neck(x)
-        losses = self.bbox_head.forward_train(x, gt_amodal_bboxes, gt_labels, x[0].shape, img_metas[0]['pad_shape'], gt_match_indices, ref_bboxes)
+        losses = self.bbox_head.forward_train(x, gt_amodal_bboxes, gt_labels, x.shape, img_metas[0]['pad_shape'],
+                                              gt_match_indices, ref_bboxes)
         return losses
 
     def _build_ref_hm_update_ref_bboxes(self, ref_img, ref_bboxes):
@@ -75,8 +76,8 @@ class CTDetector(SingleStageDetector):
                 # disturb ref_bboxes
                 if conf == 0:
                     # ref_centers[idx] = ct
-                    ref_bboxes[batch_id][idx,[0,2]] += ct[0] - ct0[0]
-                    ref_bboxes[batch_id][idx,[1,3]] += ct[1] - ct0[1]
+                    ref_bboxes[batch_id][idx, [0, 2]] += ct[0] - ct0[0]
+                    ref_bboxes[batch_id][idx, [1, 3]] += ct[1] - ct0[1]
                 gen_gaussian_target(ref_hm[batch_id, 0], ct_int, radius, k=conf)
 
                 if torch.rand(1) < self.fp_disturb:
@@ -86,6 +87,7 @@ class CTDetector(SingleStageDetector):
                     ct2_int = ct2.int()
                     gen_gaussian_target(ref_hm[batch_id, 0], ct2_int, radius, k=conf)
             return ref_hm, ref_bboxes
+
     def _build_test_hm(self, ref_img, ref_bboxes):
         batch_size, _, img_h, img_w = ref_img.shape
         assert batch_size == 1
@@ -103,7 +105,7 @@ class CTDetector(SingleStageDetector):
             scale_box_w = (bboxes[j][2] - bboxes[j][0])
             if scale_box_h <= 0 or scale_box_w <= 0:
                 continue
-            radius = gaussian_radius([torch.ceil(scale_box_h), torch.ceil(scale_box_w)],min_overlap=0.3)
+            radius = gaussian_radius([torch.ceil(scale_box_h), torch.ceil(scale_box_w)], min_overlap=0.3)
             radius = max(0, int(radius))
 
             # ct[0] = torch.ceil(ct[0] + torch.randn(1,device=bboxes.device) * self.bbox_head.hm_disturb * scale_box_w)
@@ -209,15 +211,15 @@ class CTDetector(SingleStageDetector):
                 if ref_h <= 0 or ref_w <= 0:
                     continue
 
-                radius = gaussian_radius([torch.ceil(ref_h), torch.ceil(ref_w)],min_overlap=0.3)
+                radius = gaussian_radius([torch.ceil(ref_h), torch.ceil(ref_w)], min_overlap=0.3)
                 radius = max(0, int(radius))
 
                 ct0 = ref_centers[idx]
                 ct = ref_centers[idx].clone()
 
-                ct[0] = ct[0] + torch.randn(1,device=img.device) * self.hm_disturb * ref_w
-                ct[1] = ct[1] + torch.randn(1,device=img.device) * self.hm_disturb * ref_h
-                conf = 1 if torch.randn(1,device=img.device) > self.lost_disturb else 0
+                ct[0] = ct[0] + torch.randn(1, device=img.device) * self.hm_disturb * ref_w
+                ct[1] = ct[1] + torch.randn(1, device=img.device) * self.hm_disturb * ref_h
+                conf = 1 if torch.randn(1, device=img.device) > self.lost_disturb else 0
 
                 ct_int = ct.int()
                 if conf == 0:
@@ -227,8 +229,8 @@ class CTDetector(SingleStageDetector):
 
                 if torch.randn(1) < self.fp_disturb:
                     ct2 = ct0.clone()
-                    ct2[0] = ct2[0] + torch.randn(1,device=img.device) * 0.05 * ref_w
-                    ct2[1] = ct2[1] + torch.randn(1,device=img.device) * 0.05 * ref_h
+                    ct2[0] = ct2[0] + torch.randn(1, device=img.device) * 0.05 * ref_w
+                    ct2[1] = ct2[1] + torch.randn(1, device=img.device) * 0.05 * ref_h
                     ct2_int = ct2.int()
                     gen_gaussian_target(pre_hm[batch_id, 0], ct2_int, radius, k=conf)
 

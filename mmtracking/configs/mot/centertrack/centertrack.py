@@ -106,7 +106,7 @@ model = dict(
     # init_cfg=dict(type='Pretrained', checkpoint='/home/akio/dev/mmlab/models/new_model.pth'),  # here for mmlab checkpoints
     detector=dict(
         type='CTDetector',
-        init_cfg=dict(type='Pretrained', checkpoint='/home/akio/dev/mmlab/models/new_model.pth'),  # here for original models
+        init_cfg=dict(type='Pretrained', checkpoint='../models/new_crowdhuman_mmdcn_head.pth'),  # here for original models
         backbone=dict(
             type='DLA',
             levels=[1, 1, 1, 2, 2, 1],
@@ -121,11 +121,8 @@ model = dict(
         ),
         bbox_head=dict(
             type='CenterTrackHead',
-            heads=dict(hm=1, reg=2, wh=2, tracking=2, ltrb_amodal=4),
-            head_convs=dict(hm=[256], reg=[256], wh=[256], tracking=[256], ltrb_amodal=[256]),
-            num_stacks=1,
-            last_channel=64,
-            weights=dict(hm=1, reg=1, wh=0.1, tracking=1, ltrb_amodal=0.1)
+            in_channel=64,
+            feat_channel=256,
         ),
         test_cfg=dict(topk=100, local_maximum_kernel=3, max_per_img=100),
         train_cfg=dict(fp_disturb=0.1, lost_disturb=0.4, hm_disturb=0.05)

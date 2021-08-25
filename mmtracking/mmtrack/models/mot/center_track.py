@@ -1,6 +1,4 @@
 import torch
-from mmcv.runner import load_checkpoint
-from mmcv.utils import print_log
 from mmdet.core import bbox2result
 from mmdet.models import build_detector
 from mmtrack.core import track2result
@@ -73,12 +71,12 @@ class CenterTrack(BaseMultiObjectTracker):
         batch_input_shape = tuple(img[0].size()[-2:])
         img_metas[0]['batch_input_shape'] = batch_input_shape
         x = self.detector.extract_feat(img, self.ref_img, self.ref_hm)
-        bbox_head_out = self.detector.bbox_head(x)[0]
-        center_heatmap_pred = bbox_head_out['hm']
-        wh_pred = bbox_head_out['wh']
-        offset_pred = bbox_head_out['reg']
-        tracking_pred = bbox_head_out['tracking']
-        ltrb_amodal_pred = bbox_head_out['ltrb_amodal']
+        bbox_head_out = self.detector.bbox_head(x)
+        center_heatmap_pred = bbox_head_out['center_heatmap_pred']
+        wh_pred = bbox_head_out['wh_pred']
+        offset_pred = bbox_head_out['offset_pred']
+        tracking_pred = bbox_head_out['tracking_pred']
+        ltrb_amodal_pred = bbox_head_out['ltrb_amodal_pred']
         outs = [center_heatmap_pred, wh_pred, offset_pred, tracking_pred, ltrb_amodal_pred]
         result_list = self.detector.bbox_head.get_bboxes(
             # todo Are outs always tensors?
