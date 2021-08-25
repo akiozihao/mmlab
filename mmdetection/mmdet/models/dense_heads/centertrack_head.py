@@ -2,7 +2,8 @@ import torch
 import torch.nn.functional as F
 from mmcv.runner import BaseModule
 from mmdet.models import HEADS, build_loss
-from mmdet.models.utils.gaussian_target import get_local_maximum, get_topk_from_heatmap, transpose_and_gather_feat, gaussian_radius, gen_gaussian_target
+from mmdet.models.utils.gaussian_target import get_local_maximum, get_topk_from_heatmap, transpose_and_gather_feat, \
+    gaussian_radius, gen_gaussian_target
 from torch import nn
 
 
@@ -119,11 +120,12 @@ class CenterTrackHead(BaseModule):
             outs.append(z)
         return outs
 
-    def forward_train(self, x, targets):
+    def forward_train(self, x, gt_bboxes, gt_labels, feat_shape, img_shape, gt_match_indices, ref_gt_bboxes):
         outs = self(x)
-        loss = self.loss(outs, targets)
+        loss = self.loss(outs, gt_bboxes, gt_labels, feat_shape, img_shape, gt_match_indices, ref_gt_bboxes)
         return loss
 
+    # todo ximi
     def _sigmoid_output(self, output):
         if 'hm' in output:
             output['hm'] = _sigmoid(output['hm'])
@@ -133,7 +135,8 @@ class CenterTrackHead(BaseModule):
             output['dep'] = 1. / (output['dep'].sigmoid() + 1e-6) - 1.
         return output
 
-    def loss(self, outputs, targets):
+    def loss(self, outputs, gt_bboxes, gt_labels, feat_shape, img_shape, gt_match_indices, ref_gt_bboxes):
+        targets = self.get_targets(gt_bboxes, gt_labels, feat_shape, img_shape, gt_match_indices, ref_gt_bboxes)
         outputs = outputs[0]
 
         center_heatmap_pred = outputs['hm']

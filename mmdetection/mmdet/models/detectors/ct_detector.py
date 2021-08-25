@@ -68,10 +68,7 @@ class CTDetector(SingleStageDetector):
         ref_hm = self._build_ref_hm(ref_img, ref_gt_bboxes)
         x = self.backbone(img, ref_img, ref_hm)
         x = self.neck(x)
-        feat_shape = x[0].shape
-        img_shape = img_metas[0]['pad_shape']
-        targets = self.bbox_head.get_targets(gt_bboxes, gt_labels, feat_shape, img_shape, gt_match_indices, ref_gt_bboxes)
-        losses = self.bbox_head.forward_train(x, targets)
+        losses = self.bbox_head.forward_train(x, gt_bboxes, gt_labels, x[0].shape, img_metas[0]['pad_shape'], gt_match_indices, ref_gt_bboxes)
         return losses
 
     def _build_ref_hm(self, ref_img, ref_bboxes):
@@ -100,7 +97,7 @@ class CTDetector(SingleStageDetector):
 
                 ct[0] = ct[0] + torch.randn(1, device=ref_img.device) * self.hm_disturb * ref_w
                 ct[1] = ct[1] + torch.randn(1, device=ref_img.device) * self.hm_disturb * ref_h
-                conf = 1 if torch.randn(1, device=ref_img.device) > self.lost_disturb else 0
+                conf = 1 if torch.rand(1, device=ref_img.device) > self.lost_disturb else 0
 
                 ct_int = ct.int()
                 if conf == 0:
@@ -108,7 +105,7 @@ class CTDetector(SingleStageDetector):
 
                 gen_gaussian_target(pre_hm[batch_id, 0], ct_int, radius, k=conf)
 
-                if torch.randn(1) < self.fp_disturb:
+                if torch.rand(1) < self.fp_disturb:
                     ct2 = ct0.clone()
                     ct2[0] = ct2[0] + torch.randn(1, device=ref_img.device) * 0.05 * ref_w
                     ct2[1] = ct2[1] + torch.randn(1, device=ref_img.device) * 0.05 * ref_h
