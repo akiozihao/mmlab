@@ -115,12 +115,13 @@ class CenterTrack(BaseMultiObjectTracker):
                       ref_gt_labels,
                       ref_gt_match_indices,
                       ref_gt_instance_ids):
+        gt_amodal_bboxes = gt_bboxes
+        ref_amodal_bboxes = ref_gt_bboxes
         return self.detector.forward_train(img,
                                            img_metas,
-                                           gt_bboxes,
+                                           gt_amodal_bboxes,
                                            gt_labels,
                                            gt_match_indices,
                                            ref_img,
-                                           ref_gt_bboxes,
-                                           ref_gt_labels,
+                                           ref_amodal_bboxes,
                                            )

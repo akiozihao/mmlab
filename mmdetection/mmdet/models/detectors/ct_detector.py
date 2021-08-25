@@ -1,12 +1,9 @@
-import math
-import random
-from math import sqrt
-
 import torch
 from mmdet.models.builder import DETECTORS
-from mmdet.models.utils import gen_gaussian_target,gaussian_radius
+from mmdet.models.utils import gen_gaussian_target, gaussian_radius
 
 from .single_stage import SingleStageDetector
+
 
 @DETECTORS.register_module()
 class CTDetector(SingleStageDetector):
@@ -35,23 +32,22 @@ class CTDetector(SingleStageDetector):
     def forward_train(self,
                       img,
                       img_metas,
-                      gt_bboxes,
+                      gt_amodal_bboxes,
                       gt_labels,
                       gt_match_indices,
                       ref_img,
-                      ref_gt_bboxes,
-                      ref_gt_labels):
-        ref_hm = self._build_ref_hm_update_refbboxes(ref_img, ref_gt_bboxes)
+                      ref_amodal_bboxes):
+        ref_hm,ref_bboxes = self._build_ref_hm_update_ref_bboxes(ref_img, ref_amodal_bboxes)
         x = self.backbone(img, ref_img, ref_hm)
         x = self.neck(x)
-        losses = self.bbox_head.forward_train(x, gt_bboxes, gt_labels, x[0].shape, img_metas[0]['pad_shape'], gt_match_indices, ref_gt_bboxes)
+        losses = self.bbox_head.forward_train(x, gt_amodal_bboxes, gt_labels, x[0].shape, img_metas[0]['pad_shape'], gt_match_indices, ref_bboxes)
         return losses
 
-    def _build_ref_hm_update_refbboxes(self, ref_img, ref_bboxes):
+    def _build_ref_hm_update_ref_bboxes(self, ref_img, ref_bboxes):
         bs, _, img_h, img_w = ref_img.shape
         ref_hm = ref_bboxes[-1].new_zeros([bs, 1, img_h, img_w])
         for batch_id in range(bs):
-            ref_bbox = ref_bboxes[batch_id].clone()
+            ref_bbox = ref_bboxes[batch_id]
             ref_bbox[:, [0, 2]] = torch.clip(ref_bbox[:, [0, 2]], 0, img_w - 1)
             ref_bbox[:, [1, 3]] = torch.clip(ref_bbox[:, [1, 3]], 0, img_h - 1)
             # clipped ref centers
@@ -89,7 +85,7 @@ class CTDetector(SingleStageDetector):
                     ct2[1] = ct2[1] + torch.randn(1, device=ref_img.device) * 0.05 * ref_h
                     ct2_int = ct2.int()
                     gen_gaussian_target(ref_hm[batch_id, 0], ct2_int, radius, k=conf)
-            return ref_hm
+            return ref_hm, ref_bboxes
     def _build_test_hm(self, ref_img, ref_bboxes):
         batch_size, _, img_h, img_w = ref_img.shape
         assert batch_size == 1
