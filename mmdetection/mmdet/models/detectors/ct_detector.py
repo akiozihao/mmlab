@@ -65,17 +65,17 @@ class CTDetector(SingleStageDetector):
                       ref_img,
                       ref_gt_bboxes,
                       ref_gt_labels):
-        ref_hm = self._build_ref_hm(ref_img, ref_gt_bboxes)
+        ref_hm = self._build_ref_hm_update_refbboxes(ref_img, ref_gt_bboxes)
         x = self.backbone(img, ref_img, ref_hm)
         x = self.neck(x)
         losses = self.bbox_head.forward_train(x, gt_bboxes, gt_labels, x[0].shape, img_metas[0]['pad_shape'], gt_match_indices, ref_gt_bboxes)
         return losses
 
-    def _build_ref_hm(self, ref_img, ref_bboxes):
+    def _build_ref_hm_update_refbboxes(self, ref_img, ref_bboxes):
         bs, _, img_h, img_w = ref_img.shape
         pre_hm = ref_bboxes[-1].new_zeros([bs, 1, img_h, img_w])
         for batch_id in range(bs):
-            ref_bbox = ref_bboxes  [batch_id].clone()
+            ref_bbox = ref_bboxes[batch_id]
             ref_bbox[:, [0, 2]] = torch.clip(ref_bbox[:, [0, 2]], 0, img_w - 1)
             ref_bbox[:, [1, 3]] = torch.clip(ref_bbox[:, [1, 3]], 0, img_h - 1)
             # clipped ref centers
@@ -100,9 +100,11 @@ class CTDetector(SingleStageDetector):
                 conf = 1 if torch.rand(1, device=ref_img.device) > self.lost_disturb else 0
 
                 ct_int = ct.int()
+                # disturb ref_bboxes
                 if conf == 0:
-                    ref_centers[idx] = ct
-
+                    # ref_centers[idx] = ct
+                    ref_bbox[idx,[0,2]] += ct[0] - ct0[0]
+                    ref_bbox[idx,[1,3]] += ct[1] - ct0[1]
                 gen_gaussian_target(pre_hm[batch_id, 0], ct_int, radius, k=conf)
 
                 if torch.rand(1) < self.fp_disturb:
