@@ -65,29 +65,55 @@ class CTDetector(SingleStageDetector):
                       ref_img,
                       ref_gt_bboxes,
                       ref_gt_labels):
-        batch = self._input2targets(
-            img,
-            img_metas,
-            gt_bboxes,
-            gt_labels,
-            gt_match_indices,
-            ref_img,
-            ref_gt_bboxes,
-            ref_gt_labels,
-            down_ratio=4
-        )
-        img = batch['image']
-        ref_img = batch['pre_img']
-        ref_hm = batch['pre_hm']
-        # img_metas = batch['img_metas']
-        batch_input_shape = tuple(img[0].size()[-2:])
-
-        # for img_meta in img_metas:
-        #     img_meta['batch_input_shape'] = batch_input_shape
+        ref_hm = self._build_ref_hm(ref_img, ref_gt_bboxes)
         x = self.backbone(img, ref_img, ref_hm)
         x = self.neck(x)
-        losses = self.bbox_head.forward_train(x, batch)
+        feat_shape = x[0].shape
+        img_shape = img_metas[0]['pad_shape']
+        targets = self.bbox_head.get_targets(gt_bboxes, gt_labels, feat_shape, img_shape, gt_match_indices, ref_gt_bboxes)
+        losses = self.bbox_head.forward_train(x, targets)
         return losses
+
+    def _build_ref_hm(self, ref_img, ref_bboxes):
+        bs, _, img_h, img_w = ref_img.shape
+        pre_hm = ref_bboxes[-1].new_zeros([bs, 1, img_h, img_w])
+        for batch_id in range(bs):
+            ref_bbox = ref_bboxes  [batch_id].clone()
+            ref_bbox[:, [0, 2]] = torch.clip(ref_bbox[:, [0, 2]], 0, img_w - 1)
+            ref_bbox[:, [1, 3]] = torch.clip(ref_bbox[:, [1, 3]], 0, img_h - 1)
+            # clipped ref centers
+            ref_center_x = (ref_bbox[:, [0]] + ref_bbox[:, [2]]) / 2
+            ref_center_y = (ref_bbox[:, [1]] + ref_bbox[:, [3]]) / 2
+            ref_centers = torch.cat((ref_center_x, ref_center_y), dim=1)
+            # build ref hm and update ref_centers
+            for idx in range(ref_centers.shape[0]):
+                ref_h = ref_bbox[idx][3] - ref_bbox[idx][1]
+                ref_w = ref_bbox[idx][2] - ref_bbox[idx][0]
+                if ref_h <= 0 or ref_w <= 0:
+                    continue
+
+                radius = gaussian_radius([torch.ceil(ref_h), torch.ceil(ref_w)], min_overlap=0.3)
+                radius = max(0, int(radius))
+
+                ct0 = ref_centers[idx]
+                ct = ref_centers[idx].clone()
+
+                ct[0] = ct[0] + torch.randn(1, device=ref_img.device) * self.hm_disturb * ref_w
+                ct[1] = ct[1] + torch.randn(1, device=ref_img.device) * self.hm_disturb * ref_h
+                conf = 1 if torch.randn(1, device=ref_img.device) > self.lost_disturb else 0
+
+                ct_int = ct.int()
+                if conf == 0:
+                    ref_centers[idx] = ct
+
+                gen_gaussian_target(pre_hm[batch_id, 0], ct_int, radius, k=conf)
+
+                if torch.randn(1) < self.fp_disturb:
+                    ct2 = ct0.clone()
+                    ct2[0] = ct2[0] + torch.randn(1, device=ref_img.device) * 0.05 * ref_w
+                    ct2[1] = ct2[1] + torch.randn(1, device=ref_img.device) * 0.05 * ref_h
+                    ct2_int = ct2.int()
+                    gen_gaussian_target(pre_hm[batch_id, 0], ct2_int, radius, k=conf)
 
     def _build_test_hm(self, ref_img, ref_bboxes):
         batch_size, _, img_h, img_w = ref_img.shape

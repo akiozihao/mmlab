@@ -1,8 +1,8 @@
 import torch
 import torch.nn.functional as F
 from mmcv.runner import BaseModule
-from mmdet.models import HEADS
-from mmdet.models.utils.gaussian_target import get_local_maximum, get_topk_from_heatmap, transpose_and_gather_feat
+from mmdet.models import HEADS, build_loss
+from mmdet.models.utils.gaussian_target import get_local_maximum, get_topk_from_heatmap, transpose_and_gather_feat, gaussian_radius, gen_gaussian_target
 from torch import nn
 
 
@@ -40,7 +40,13 @@ def _sigmoid(x):
 @HEADS.register_module()
 class CenterTrackHead(BaseModule):
     def __init__(self,
-                 heads, head_convs, num_stacks, last_channel, weights, init_cfg=None, train_cfg=None, test_cfg=None):
+                 heads, head_convs, num_stacks, last_channel, weights,
+                 loss_center_heatmap=dict(type='GaussianFocalLoss', loss_weight=1.0),
+                 loss_offset=dict(type='L1Loss', loss_weight=1.0),
+                 loss_wh=dict(type='L1Loss', loss_weight=0.1),
+                 loss_tracking=dict(type='L1Loss', loss_weight=1.0),
+                 loss_ltrb_amodal=dict(type='L1Loss', loss_weight=0.1),
+                 init_cfg=None, train_cfg=None, test_cfg=None):
         super(CenterTrackHead, self).__init__(init_cfg)
         self.use_ltrb = True
         self.test_cfg = test_cfg
@@ -97,6 +103,12 @@ class CenterTrackHead(BaseModule):
                     fill_fc_weights(fc)
             self.__setattr__(head, fc)
 
+        self.loss_center_heatmap = build_loss(loss_center_heatmap)
+        self.loss_offset = build_loss(loss_offset)
+        self.loss_wh = build_loss(loss_wh)
+        self.loss_tracking = build_loss(loss_tracking)
+        self.loss_ltrb_amodal = build_loss(loss_ltrb_amodal)
+
     def forward(self, feats):
         outs = []
         for s in range(self.num_stacks):
@@ -107,9 +119,9 @@ class CenterTrackHead(BaseModule):
             outs.append(z)
         return outs
 
-    def forward_train(self, x, batch):
+    def forward_train(self, x, targets):
         outs = self(x)
-        loss = self.loss(outs, batch)
+        loss = self.loss(outs, targets)
         return loss
 
     def _sigmoid_output(self, output):
@@ -121,54 +133,166 @@ class CenterTrackHead(BaseModule):
             output['dep'] = 1. / (output['dep'].sigmoid() + 1e-6) - 1.
         return output
 
-    def loss(self, outputs, batch):
-        losses = {head: 0 for head in self.heads}
+    def loss(self, outputs, targets):
+        outputs = outputs[0]
 
-        for s in range(self.num_stacks):
-            output = outputs[s]
+        center_heatmap_pred = outputs['hm']
+        offset_pred = outputs['reg']
+        wh_pred = outputs['wh']
+        tracking_pred = outputs['tracking']
+        ltrb_amodal_pred = outputs['ltrb_amodal']
 
-            if 'hm' in output:
-                losses['hm'] += self.crit(
-                    output['hm'], batch['hm'], batch['ind'],
-                    batch['mask'], batch['cat']) / self.num_stacks
+        center_heatmap_target = targets['center_heatmap_target']
+        offset_target = targets['offset_target']
+        wh_target = targets['wh_target']
+        tracking_target = targets['tracking_target']
+        ltrb_amodal_target = targets['ltrb_amodal_target']
 
-            regression_heads = [
-                'reg', 'wh', 'tracking', 'ltrb', 'ltrb_amodal', 'hps',
-                'dep', 'dim', 'amodel_offset', 'velocity']
+        wh_offset_target_weight = targets['wh_offset_target_weight']
+        ltrb_amodal_target_weight = targets['ltrb_amodal_target_weight']
+        tracking_target_weight = targets['tracking_target_weight']
 
-            for head in regression_heads:
-                if head in output:
-                    losses[head] += self.crit_reg(
-                        output[head], batch[head + '_mask'],
-                        batch['ind'], batch[head]) / self.num_stacks
+        avg_factor = targets['avg_factor']
 
-            if 'hm_hp' in output:
-                losses['hm_hp'] += self.crit(
-                    output['hm_hp'], batch['hm_hp'], batch['hp_ind'],
-                    batch['hm_hp_mask'], batch['joint']) / self.num_stacks
-                if 'hp_offset' in output:
-                    losses['hp_offset'] += self.crit_reg(
-                        output['hp_offset'], batch['hp_offset_mask'],
-                        batch['hp_ind'], batch['hp_offset']) / self.num_stacks
+        loss_center_heatmap = self.loss_center_heatmap(
+            center_heatmap_pred,
+            center_heatmap_target,
+            avg_factor=avg_factor)
+        loss_offset = self.loss_offset(
+            offset_pred,
+            offset_target,
+            wh_offset_target_weight,
+            avg_factor=avg_factor * 2)
+        loss_wh = self.loss_wh(
+            wh_pred,
+            wh_target,
+            wh_offset_target_weight,
+            avg_factor=avg_factor * 2)
+        loss_tracking = self.loss_wh(
+            tracking_pred,
+            tracking_target,
+            tracking_target_weight,
+            avg_factor=avg_factor * 2)
+        loss_ltrb_amodal = self.loss_wh(
+            ltrb_amodal_pred,
+            ltrb_amodal_target,
+            ltrb_amodal_target_weight,
+            avg_factor=avg_factor * 4)
+        return dict(
+            loss_center_heatmap=loss_center_heatmap,
+            loss_wh=loss_wh,
+            loss_offset=loss_offset,
+            loss_tracking=loss_tracking,
+            loss_ltrb_amodal=loss_ltrb_amodal)
 
-            if 'rot' in output:
-                losses['rot'] += self.crit_rot(
-                    output['rot'], batch['rot_mask'], batch['ind'], batch['rotbin'],
-                    batch['rotres']) / self.num_stacks
+    def get_targets(self, gt_bboxes, gt_labels, feat_shape, img_shape, gt_match_indices, ref_gt_bboxes):
+        """
+        self, gt_bboxes, gt_labels, feat_shape, img_shape,
+                    gt_match_indices,
+                    ref_gt_bboxes
+        Returns: dict
+             img,ref_img,ref_hm
+             hm_target,reg_target,tracking_target,wh_target,ltrb_amodal_target,ind
+        """
+        targets = dict()
 
-            if 'nuscenes_att' in output:
-                losses['nuscenes_att'] += self.crit_nuscenes_att(
-                    output['nuscenes_att'], batch['nuscenes_att_mask'],
-                    batch['ind'], batch['nuscenes_att']) / self.num_stacks
+        img_h, img_w = img_shape[:2]
+        bs, _, feat_h, feat_w = feat_shape
 
-        for head in self.heads:
-            losses[head] = self.weights[head] * losses[head]
+        width_ratio = float(feat_w / img_w)
+        height_ratio = float(feat_h / img_h)
 
-        format_loss = dict()
-        for k, v in losses.items():
-            nk = 'loss_' + k
-            format_loss[nk] = v
-        return format_loss
+        center_heatmap_target = gt_bboxes[-1].new_zeros([bs, self.num_classes, feat_h, feat_w])
+
+        wh_target = gt_bboxes[-1].new_zeros([bs, 2, feat_h, feat_w])
+        offset_target = gt_bboxes[-1].new_zeros([bs, 2, feat_h, feat_w])
+        wh_offset_target_weight = gt_bboxes[-1].new_zeros([bs, 2, feat_h, feat_w])
+
+        tracking_target = gt_bboxes[-1].new_zeros([bs, 2, feat_h, feat_w])
+        tracking_target_weight = gt_bboxes[-1].new_zeros([bs, 2, feat_h, feat_w])
+
+        ltrb_amodal_target = gt_bboxes[-1].new_zeros([bs, 4, feat_h, feat_w])
+        ltrb_amodal_target_weight = gt_bboxes[-1].new_zeros([bs, 4, feat_h, feat_w])
+
+        for batch_id in range(bs):
+            # amodal scale gt bbox
+            scale_gt_amodal_bbox = gt_bboxes[batch_id].clone()
+            scale_gt_amodal_bbox[:, [0, 2]] = scale_gt_amodal_bbox[:, [0, 2]] * width_ratio
+            scale_gt_amodal_bbox[:, [1, 3]] = scale_gt_amodal_bbox[:, [1, 3]] * height_ratio
+            # clipped scale gt bbox
+            scale_gt_bbox = gt_bboxes[batch_id].clone()
+            scale_gt_bbox[:, [0, 2]] = torch.clip(scale_gt_bbox[:, [0, 2]] * width_ratio, 0, feat_w - 1)
+            scale_gt_bbox[:, [1, 3]] = torch.clip(scale_gt_bbox[:, [1, 3]] * height_ratio, 0, feat_h - 1)
+            #  clipped scale ref bbox
+            scale_ref_bbox = ref_gt_bboxes[batch_id].clone()
+            scale_ref_bbox[:, [0, 2]] = torch.clip(scale_ref_bbox[:, [0, 2]] * width_ratio, 0, feat_w - 1)
+            scale_ref_bbox[:, [1, 3]] = torch.clip(scale_ref_bbox[:, [1, 3]] * height_ratio, 0, feat_h - 1)
+            # clipped ref bbox
+            ref_bbox = ref_gt_bboxes[batch_id].clone()
+            ref_bbox[:, [0, 2]] = torch.clip(ref_bbox[:, [0, 2]], 0, img_w - 1)
+            ref_bbox[:, [1, 3]] = torch.clip(ref_bbox[:, [1, 3]], 0, img_h - 1)
+            # centers
+            # clipped scale gt centers
+            scale_gt_center_x = (scale_gt_bbox[:, [0]] + scale_gt_bbox[:, [2]]) / 2
+            scale_gt_center_y = (scale_gt_bbox[:, [1]] + scale_gt_bbox[:, [3]]) / 2
+            # clipped ref centers
+            ref_center_x = (ref_bbox[:, [0]] + ref_bbox[:, [2]]) / 2
+            ref_center_y = (ref_bbox[:, [1]] + ref_bbox[:, [3]]) / 2
+            ref_centers = torch.cat((ref_center_x, ref_center_y), dim=1)
+            # labels
+            gt_label = gt_labels[batch_id]
+
+            # cat centers
+            scale_gt_centers = torch.cat((scale_gt_center_x, scale_gt_center_y), dim=1)
+
+            for j, ct in enumerate(scale_gt_centers):
+                ctx, cty = ct
+                scale_box_h = scale_gt_bbox[j][3] - scale_gt_bbox[j][1]
+                scale_box_w = scale_gt_bbox[j][2] - scale_gt_bbox[j][0]
+                if scale_box_h <= 0 or scale_box_w <= 0:
+                    continue
+                radius = gaussian_radius([torch.ceil(scale_box_h), torch.ceil(scale_box_w)], min_overlap=0.3)
+                radius = max(0, int(radius))
+
+                ctx_int, cty_int = ct.int()
+                gen_gaussian_target(center_heatmap_target[batch_id, gt_label[j]],
+                                    [ctx_int, cty_int], radius)
+
+                wh_target[batch_id, 0, cty_int, ctx_int] = scale_box_w
+                wh_target[batch_id, 1, cty_int, ctx_int] = scale_box_h
+                wh_offset_target_weight[batch_id, :, cty_int, ctx_int] = 1
+
+                offset_target[batch_id, 0, cty_int, ctx_int] = ctx - ctx_int
+                offset_target[batch_id, 1, cty_int, ctx_int] = cty - cty_int
+
+                ltrb_amodal_target[batch_id, 0, cty_int, ctx_int] = scale_gt_amodal_bbox[j, 0] - ctx_int
+                ltrb_amodal_target[batch_id, 1, cty_int, ctx_int] = scale_gt_amodal_bbox[j, 1] - cty_int
+                ltrb_amodal_target[batch_id, 2, cty_int, ctx_int] = scale_gt_amodal_bbox[j, 2] - ctx_int
+                ltrb_amodal_target[batch_id, 3, cty_int, ctx_int] = scale_gt_amodal_bbox[j, 3] - cty_int
+                ltrb_amodal_target_weight[batch_id, :, cty_int, ctx_int] = 1
+
+                if gt_match_indices[batch_id][j] != -1:
+                    idx = gt_match_indices[batch_id][j]
+                    scale_ref_h = scale_ref_bbox[idx][3] - scale_ref_bbox[idx][1]
+                    scale_ref_w = scale_ref_bbox[idx][2] - scale_ref_bbox[idx][0]
+                    if scale_ref_h <= 0 or scale_ref_w <= 0:
+                        continue
+                    else:
+                        ref_ctx, ref_cty = ref_centers[idx]
+                        tracking_target[batch_id, 0, cty_int, ctx_int] = ref_ctx * width_ratio - ctx_int
+                        tracking_target[batch_id, 1, cty_int, ctx_int] = ref_cty * height_ratio - cty_int
+                        tracking_target_weight[batch_id, :, cty_int, ctx_int] = 1
+
+        targets['center_heatmap_target'] = center_heatmap_target
+        targets['wh_target'] = wh_target
+        targets['wh_offset_target_weight'] = wh_offset_target_weight
+        targets['offset_target'] = offset_target
+        targets['ltrb_amodal_target'] = ltrb_amodal_target
+        targets['ltrb_amodal_target_weight'] = ltrb_amodal_target_weight
+        targets['tracking_target'] = tracking_target
+        targets['tracking_target_weight'] = tracking_target_weight
+        targets['avg_factor'] = max(1, center_heatmap_target.eq(1).sum())
+        return targets
 
     def get_bboxes(self,
                    center_heatmap_preds,
