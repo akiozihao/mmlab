@@ -49,7 +49,7 @@ class CTDetector(SingleStageDetector):
 
     def _build_ref_hm_update_refbboxes(self, ref_img, ref_bboxes):
         bs, _, img_h, img_w = ref_img.shape
-        pre_hm = ref_bboxes[-1].new_zeros([bs, 1, img_h, img_w])
+        ref_hm = ref_bboxes[-1].new_zeros([bs, 1, img_h, img_w])
         for batch_id in range(bs):
             ref_bbox = ref_bboxes[batch_id].clone()
             ref_bbox[:, [0, 2]] = torch.clip(ref_bbox[:, [0, 2]], 0, img_w - 1)
@@ -81,15 +81,15 @@ class CTDetector(SingleStageDetector):
                     # ref_centers[idx] = ct
                     ref_bboxes[batch_id][idx,[0,2]] += ct[0] - ct0[0]
                     ref_bboxes[batch_id][idx,[1,3]] += ct[1] - ct0[1]
-                gen_gaussian_target(pre_hm[batch_id, 0], ct_int, radius, k=conf)
+                gen_gaussian_target(ref_hm[batch_id, 0], ct_int, radius, k=conf)
 
                 if torch.rand(1) < self.fp_disturb:
                     ct2 = ct0.clone()
                     ct2[0] = ct2[0] + torch.randn(1, device=ref_img.device) * 0.05 * ref_w
                     ct2[1] = ct2[1] + torch.randn(1, device=ref_img.device) * 0.05 * ref_h
                     ct2_int = ct2.int()
-                    gen_gaussian_target(pre_hm[batch_id, 0], ct2_int, radius, k=conf)
-
+                    gen_gaussian_target(ref_hm[batch_id, 0], ct2_int, radius, k=conf)
+            return ref_hm
     def _build_test_hm(self, ref_img, ref_bboxes):
         batch_size, _, img_h, img_w = ref_img.shape
         assert batch_size == 1
