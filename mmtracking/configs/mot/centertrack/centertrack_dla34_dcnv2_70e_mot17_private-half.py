@@ -38,7 +38,8 @@ train_pipeline = [
         keys=[
             'img', 'gt_bboxes', 'gt_labels', 'gt_match_indices',
             'gt_instance_ids'
-        ]),
+        ]
+    ),
     dict(type='SeqDefaultFormatBundle', ref_prefix='ref')
 ]
 test_pipeline = [
@@ -56,15 +57,13 @@ test_pipeline = [
             dict(type='ImageToTensor', keys=['img']),
             dict(
                 type='VideoCollect',
-                meta_keys=('filename', 'ori_shape', 'img_shape', 'pad_shape',
-                           'scale_factor', 'flip', 'flip_direction',
-                           'img_norm_cfg','invert_transform'),
+                meta_keys=('pad_shape', 'invert_transform'),
                 keys=['img'])
-        ])
+        ]
+    )
 ]
 
 data_root = '../data/mot17-frcnn/'
-# data_root = '/home/akio/data/MOT/MOT17-mini/'
 data = dict(
     samples_per_gpu=4,
     workers_per_gpu=0,
@@ -82,19 +81,23 @@ data = dict(
                 frame_range=2,
                 filter_key_img=True,
                 method='uniform'),
-            pipeline=train_pipeline)),
+            pipeline=train_pipeline)
+    ),
     val=dict(
         type=dataset_type,
         ann_file=data_root + 'annotations/half-val_cocoformat.json',
         img_prefix=data_root + 'train',
         ref_img_sampler=None,
-        pipeline=test_pipeline),
+        pipeline=test_pipeline
+    ),
     test=dict(
         type=dataset_type,
         ann_file=data_root + 'annotations/half-val_cocoformat.json',
         img_prefix=data_root + 'train',
         ref_img_sampler=None,
-        pipeline=test_pipeline))
+        pipeline=test_pipeline
+    )
+)
 model = dict(
     type='CenterTrack',
     init_cfg=dict(type='Pretrained', checkpoint='../models/mmlab_crowdhuman.pth'),  # here for mmlab checkpoints
@@ -135,7 +138,8 @@ lr_config = dict(
     # warmup='linear',
     # warmup_iters=1000,
     # warmup_ratio=1.0 / 1000,
-    step=[60])
+    step=[60]
+)
 
 # runtime settings
 total_epochs = 70
