@@ -2,51 +2,10 @@ import math
 
 import numpy as np
 # from CenterTrack.src.lib.model.networks.DCNv2.dcn_v2 import DCN
-from mmcv.cnn import ConvModule
 from mmcv.cnn import build_conv_layer
-from mmcv.ops import ModulatedDeformConv2dPack
+from mmcv.cnn import ConvModule
 from mmcv.runner import BaseModule
 from mmdet.models.builder import NECKS
-from torch import nn
-
-
-# class DeformConv(nn.Module):
-#     def __init__(self, chi, cho):
-#         super(DeformConv, self).__init__()
-#         self.actf = nn.Sequential(
-#             nn.BatchNorm2d(cho, momentum=0.1),
-#             nn.ReLU(inplace=True)
-#         )
-#         self.conv = DCN(chi, cho, kernel_size=(3, 3), stride=1, padding=1, dilation=1, deformable_groups=1)
-#
-#     def forward(self, x):
-#         x = self.conv(x)
-#         x = self.actf(x)
-#         return x
-
-
-class DeformConv(nn.Module):
-    def __init__(self, chi, cho):
-        super(DeformConv, self).__init__()
-        self.actf = nn.Sequential(
-            nn.BatchNorm2d(cho, momentum=0.1),
-            nn.ReLU(inplace=True)
-        )
-        self.conv = ModulatedDeformConv2dPack(
-            in_channels=chi,
-            out_channels=cho,
-            kernel_size=(3, 3),
-            stride=1,
-            padding=1,
-            dilation=1,
-            groups=1,
-            deform_groups=1,
-            bias=True)
-
-    def forward(self, x):
-        x = self.conv(x)
-        x = self.actf(x)
-        return x
 
 
 class IDAUp(BaseModule):
@@ -60,32 +19,28 @@ class IDAUp(BaseModule):
                  init_cfg=None
                  ):
         super(IDAUp, self).__init__(init_cfg)
+        self.use_dcn = use_dcn
         for i in range(1, len(channels)):
             c = channels[i]
             f = int(up_f[i])
-            # todo check mmtracking dcnv2
-            if use_dcn:
-                proj = DeformConv(c, planes)
-                node = DeformConv(planes, planes)
-            else:
-                proj = ConvModule(
-                    c,
-                    planes,
-                    3,
-                    padding=1,
-                    conv_cfg=conv_cfg,
-                    norm_cfg=norm_cfg,
-                    bias=True
-                )
-                node = ConvModule(
-                    planes,
-                    planes,
-                    3,
-                    padding=1,
-                    conv_cfg=conv_cfg,
-                    norm_cfg=norm_cfg,
-                    bias=True
-                )
+            proj = ConvModule(
+                c,
+                planes,
+                3,
+                padding=1,
+                conv_cfg=dict(type='DCNv2') if use_dcn else conv_cfg,
+                norm_cfg=norm_cfg,
+                bias=True
+            )
+            node = ConvModule(
+                planes,
+                planes,
+                3,
+                padding=1,
+                conv_cfg=dict(type='DCNv2') if use_dcn else conv_cfg,
+                norm_cfg=norm_cfg,
+                bias=True
+            )
 
             up = build_conv_layer(
                 dict(type='deconv'),
@@ -162,8 +117,7 @@ class DLAUp(BaseModule):
                           scales[j:] // scales[j],
                           use_dcn=use_dcn,
                           conv_cfg=conv_cfg,
-                          norm_cfg=norm_cfg,
-                          init_cfg=init_cfg))
+                          norm_cfg=norm_cfg))
             scales[j + 1:] = scales[j]
             in_channels[j + 1:] = [channels[j] for _ in channels[j + 1:]]
 
@@ -196,8 +150,7 @@ class DLANeck(BaseModule):
             scales,
             use_dcn=use_dcn,
             conv_cfg=conv_cfg,
-            norm_cfg=norm_cfg,
-            init_cfg=init_cfg
+            norm_cfg=norm_cfg
         )
         out_channel = channels[self.first_level]
 
@@ -206,8 +159,7 @@ class DLANeck(BaseModule):
             [2 ** i for i in range(self.last_level - self.first_level)],
             use_dcn=use_dcn,
             conv_cfg=conv_cfg,
-            norm_cfg=norm_cfg,
-            init_cfg=init_cfg
+            norm_cfg=norm_cfg
         )
 
     def forward(self, x):
