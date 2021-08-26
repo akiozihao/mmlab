@@ -97,16 +97,10 @@ data = dict(
         pipeline=test_pipeline))
 model = dict(
     type='CenterTrack',
-    # pretrains=dict(
-    #     # detector='/home/akio/Downloads/new_crowdhuman.pth'
-    #     # detector = '/home/akio/dev/centertrack_origin/models/crowdhuman.pth'
-    #     detector='/home/akio/dev/mmlab/models/new_model.pth'
-    #     # detector='/home/akio/dev/mmlab/models/4_epoch_5.pth'
-    # ),
-    # init_cfg=dict(type='Pretrained', checkpoint='/home/akio/dev/mmlab/models/new_model.pth'),  # here for mmlab checkpoints
+    init_cfg=dict(type='Pretrained', checkpoint='../models/mmlab_crowdhuman.pth'),  # here for mmlab checkpoints
     detector=dict(
         type='CTDetector',
-        init_cfg=dict(type='Pretrained', checkpoint='../models/new_crowdhuman_mmdcn_head.pth'),  # here for original models
+        # init_cfg=dict(type='Pretrained', checkpoint='../models/new_crowdhuman_mmdcn_head_neck.pth'),  # here for original models
         backbone=dict(
             type='DLA',
             levels=[1, 1, 1, 2, 2, 1],
