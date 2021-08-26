@@ -1,7 +1,7 @@
 import numpy as np
 import torch
-
 from mmtrack.models import TRACKERS
+
 from .base_tracker import BaseTracker
 
 
@@ -10,7 +10,7 @@ class CTTracker(BaseTracker):
     def __init__(self,
                  obj_score_thr=0.4,
                  momentums=None,
-                 num_frames_retain=1):
+                 num_frames_retain=3):
         super(CTTracker, self).__init__(momentums, num_frames_retain)
         self.obj_score_thr = obj_score_thr
 
@@ -27,6 +27,7 @@ class CTTracker(BaseTracker):
         labels = labels[valid_inds]
 
         pre_bboxes = self.pre_bboxes
+        active = torch.ones(bboxes.size(0), dtype=torch.long)
         if self.empty or bboxes.size(0) == 0 or pre_bboxes is None:
             num_new_tracks = bboxes.size(0)
             ids = torch.arange(
@@ -42,16 +43,13 @@ class CTTracker(BaseTracker):
                          (pre_bboxes[:, 2] - pre_bboxes[:, 0])  # M
             item_size = (bboxes[:, 3] - bboxes[:, 1]) * (bboxes[:, 2] - bboxes[:, 0])  # N
             det_centers_with_motion = self._xyxy2center(bboxes_with_motion)
-            # dist = torch.cdist(det_centers, self.pre_centers, 2)
-            dist = (((self.pre_cts.reshape(1, -1, 2) - \
-                      det_centers_with_motion.reshape(-1, 1, 2)) ** 2).sum(axis=2))
+            dist = torch.cdist(det_centers_with_motion, self.pre_cts, 2)
             # invalid
             invalid = ((dist > track_size.reshape(1, M)) + \
                        (dist > item_size.reshape(N, 1)) + \
                        (labels.reshape(N, 1) != self.pre_labels.reshape(1, M))) > 0
             dist = dist + invalid * 1e18
             matched_indices = self._greedy_assignment(dist)
-            # pre_ids = self.pre_ids
             ids[matched_indices[:, 0]] = self.pre_ids[matched_indices[:, 1]]
             new_track_inds = ids == -1
             ids[new_track_inds] = torch.arange(
@@ -59,18 +57,35 @@ class CTTracker(BaseTracker):
                 self.num_tracks + new_track_inds.sum(),
                 dtype=torch.long)
             self.num_tracks += new_track_inds.sum()
+
+            # deactivate unmatched track
+            for k, v in self.tracks.items():
+                if k not in self.pre_ids[matched_indices[:, 1]]:
+                    v['active'][-1] &= 0
+
         self.update(
             ids=ids,
             bboxes_input=bboxes_input,
             bboxes=bboxes,
             cts=self._xyxy2center(bboxes),
             labels=labels,
+            active=active,
             frame_ids=frame_id)
         return bboxes, labels, ids
 
     @property
     def bboxes_input(self):
         bboxes = [track['bboxes_input'][-1] for id, track in self.tracks.items()]
+        if len(bboxes) == 0:
+            return None
+        return torch.cat(bboxes, 0)
+
+    @property
+    def pre_active_bboxes_input(self):
+        bboxes = []
+        for id, track in self.tracks.items():
+            if track['active'][-1] == 1:
+                bboxes.append(track['bboxes_input'][-1])
         if len(bboxes) == 0:
             return None
         return torch.cat(bboxes, 0)

@@ -260,7 +260,7 @@ class CenterTrackHead(CenterNetHead):
                 batch_gt_bboxes_with_motion[batch_id, :, 2:-1],
                 invert_transfrom[batch_id])
 
-        if with_nms:
+        if with_nms:  # todo
             det_results = []
             for (det_bboxes, det_labels, ref_bboxes) in zip(batch_det_bboxes,
                                                             batch_labels, batch_gt_bboxes_with_motion):
@@ -353,3 +353,61 @@ class CenterTrackHead(CenterNetHead):
         with_motion_batch_bboxes = torch.cat((with_motion_batch_bboxes, batch_scores[..., None]),
                                              dim=-1)
         return batch_bboxes, batch_topk_labels, with_motion_batch_bboxes
+
+    def get_public_bboxes(self,
+                          center_heatmap_pred,
+                          tracking_pred,
+                          public_bboxes,
+                          public_scores,
+                          public_labels,
+                          img_metas,
+                          k=100,
+                          kernel=3):
+        """
+
+        Args:
+            center_heatmap_pred:
+            tracking_pred:
+            public_bboxes: List(Tensor : N,4)
+            public_scores: List(Tensor : 1,N)
+            public_labels: List(Tensor : 1,N)
+            img_metas:
+            k:
+            kernel:
+
+        Returns: det_bboxes
+                 det_labels
+                 det_bboxes_with_motion
+                 det_bboxes_input
+
+        """
+        batch_labels = public_labels[0]
+        batch_det_bboxes_input = torch.cat((public_bboxes[0], public_scores[0].unsqueeze(-1)), -1)
+        batch_det_bboxes = batch_det_bboxes_input.clone()
+        bs = batch_det_bboxes.shape[0]
+        invert_tranform = img_metas[0]['invert_transform']
+        for batch_id in range(bs):
+            batch_det_bboxes[batch_id, :, :2] = self._affine_transform(batch_det_bboxes[batch_id, :, :2],
+                                                                       invert_tranform)
+            batch_det_bboxes[batch_id, :, 2:-1] = self._affine_transform(batch_det_bboxes[batch_id, :, 2:-1],
+                                                                         invert_tranform)
+        height, width = center_heatmap_pred.shape[2:]
+        inp_h, inp_w = img_metas[0]['batch_input_shape']
+
+        center_heatmap_pred = get_local_maximum(
+            center_heatmap_pred, kernel=kernel)
+
+        *batch_dets, _, _ = get_topk_from_heatmap(
+            center_heatmap_pred, k=k)
+        _, batch_index, _ = batch_dets
+        tracking_offset = transpose_and_gather_feat(tracking_pred, batch_index)
+        batch_bboxes_with_motion = batch_det_bboxes.clone()
+        for batch_id in range(bs):
+            batch_bboxes_with_motion[batch_id, :, [0, 2]] += tracking_offset[..., 0] * (inp_w / width)
+            batch_bboxes_with_motion[batch_id, :, [1, 3]] += tracking_offset[..., 1] * (inp_h / height)
+
+        det_results = [
+            tuple(bs) for bs in
+            zip(batch_det_bboxes, batch_labels, batch_bboxes_with_motion, batch_det_bboxes_input)
+        ]
+        return det_results
