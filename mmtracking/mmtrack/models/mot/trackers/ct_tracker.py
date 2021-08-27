@@ -1,7 +1,7 @@
 import numpy as np
 import torch
-from mmtrack.models import TRACKERS
 
+from mmtrack.models import TRACKERS
 from .base_tracker import BaseTracker
 
 
@@ -19,57 +19,78 @@ class CTTracker(BaseTracker):
               bboxes,
               bboxes_with_motion,
               labels,
-              frame_id):
+              frame_id,
+              public_bboxes,
+              public_labels):
         valid_inds = bboxes[:, -1] > self.obj_score_thr
         bboxes_input = bboxes_input[valid_inds]
         bboxes = bboxes[valid_inds]
         bboxes_with_motion = bboxes_with_motion[valid_inds]
+        det_centers_with_motion = self._xyxy2center(bboxes_with_motion)
         labels = labels[valid_inds]
-
+        item_size = (bboxes[:, 3] - bboxes[:, 1]) * (bboxes[:, 2] - bboxes[:, 0])  # N
+        ids = torch.full((bboxes.size(0),), -1, dtype=torch.long)
         pre_bboxes = self.pre_bboxes
-        active = torch.ones(bboxes.size(0), dtype=torch.long)
+        M = pre_bboxes.shape[0]
+        N = bboxes.shape[0]
         if self.empty or bboxes.size(0) == 0 or pre_bboxes is None:
-            num_new_tracks = bboxes.size(0)
-            ids = torch.arange(
-                self.num_tracks,
-                self.num_tracks + num_new_tracks,
-                dtype=torch.long)
-            self.num_tracks += num_new_tracks
+            if public_bboxes is not None:
+                p_dist = torch.cdist(det_centers_with_motion, self._xyxy2center(public_bboxes))
+                p_invalid = p_dist > item_size.reshape(N, 1)
+                p_dist += p_invalid * 1e18
+                p_matched_indices = self._greedy_assignment(p_dist)
+                ids[p_matched_indices[:, 0]] = torch.arange(
+                    self.num_tracks,
+                    self.num_tracks + p_matched_indices.shape[0],
+                    dtype=torch.long)
+                self.num_tracks += p_matched_indices.shape[0]
+            else:
+                num_new_tracks = bboxes.size(0)
+                ids = torch.arange(
+                    self.num_tracks,
+                    self.num_tracks + num_new_tracks,
+                    dtype=torch.long)
+                self.num_tracks += num_new_tracks
         else:
-            ids = torch.full((bboxes.size(0),), -1, dtype=torch.long)
-            M = pre_bboxes.shape[0]
-            N = bboxes.shape[0]
             track_size = (pre_bboxes[:, 3] - pre_bboxes[:, 1]) * \
                          (pre_bboxes[:, 2] - pre_bboxes[:, 0])  # M
-            item_size = (bboxes[:, 3] - bboxes[:, 1]) * (bboxes[:, 2] - bboxes[:, 0])  # N
-            det_centers_with_motion = self._xyxy2center(bboxes_with_motion)
-            dist = torch.cdist(det_centers_with_motion, self.pre_cts, 2)
+            # dist = torch.cdist(det_centers, self.pre_centers, 2)
+            dist = (((self.pre_cts.reshape(1, -1, 2) - \
+                      det_centers_with_motion.reshape(-1, 1, 2)) ** 2).sum(axis=2))
             # invalid
             invalid = ((dist > track_size.reshape(1, M)) + \
                        (dist > item_size.reshape(N, 1)) + \
                        (labels.reshape(N, 1) != self.pre_labels.reshape(1, M))) > 0
             dist = dist + invalid * 1e18
             matched_indices = self._greedy_assignment(dist)
+            # pre_ids = self.pre_ids
             ids[matched_indices[:, 0]] = self.pre_ids[matched_indices[:, 1]]
             new_track_inds = ids == -1
-            ids[new_track_inds] = torch.arange(
-                self.num_tracks,
-                self.num_tracks + new_track_inds.sum(),
-                dtype=torch.long)
-            self.num_tracks += new_track_inds.sum()
 
-            # deactivate unmatched track
-            for k, v in self.tracks.items():
-                if k not in self.pre_ids[matched_indices[:, 1]]:
-                    v['active'][-1] &= 0
-
+            # public detection
+            if public_bboxes is not None:
+                p_dist = torch.cdist(det_centers_with_motion, self._xyxy2center(public_bboxes))
+                p_dist[matched_indices[:, 0], :] += 1e18
+                p_invalid = p_dist > item_size.reshape(N, 1)
+                p_dist += p_invalid * 1e18
+                p_matched_indices = self._greedy_assignment(p_dist)
+                ids[p_matched_indices[:, 0]] = torch.arange(
+                    self.num_tracks,
+                    self.num_tracks + p_matched_indices.shape[0],
+                    dtype=torch.long)
+                self.num_tracks += p_matched_indices.shape[0]
+            else:
+                ids[new_track_inds] = torch.arange(
+                    self.num_tracks,
+                    self.num_tracks + new_track_inds.sum(),
+                    dtype=torch.long)
+                self.num_tracks += new_track_inds.sum()
         self.update(
             ids=ids,
             bboxes_input=bboxes_input,
             bboxes=bboxes,
             cts=self._xyxy2center(bboxes),
             labels=labels,
-            active=active,
             frame_ids=frame_id)
         return bboxes, labels, ids
 
@@ -133,4 +154,5 @@ class CTTracker(BaseTracker):
             if dist[i][j] < 1e16:
                 dist[:, j] = 1e18
                 matched_indices.append([i, j])
-        return np.array(matched_indices, np.int32).reshape(-1, 2)
+        return np.array(matched_indices, np.int32).reshape(-1, 2
+)

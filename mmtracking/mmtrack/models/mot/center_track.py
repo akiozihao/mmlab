@@ -67,35 +67,30 @@ class CenterTrack(BaseMultiObjectTracker):
         offset_pred = bbox_head_out['offset_pred']
         tracking_pred = bbox_head_out['tracking_pred']
         ltrb_amodal_pred = bbox_head_out['ltrb_amodal_pred']
-        if public_bboxes is not None:
-            assert public_labels is not None
-            assert public_scores is not None
-            result_list = self.detector.bbox_head.get_public_bboxes(
-                center_heatmap_pred,
-                tracking_pred,
-                public_bboxes,
-                public_scores,
-                public_labels,
-                img_metas,
-            )
-        else:
-            outs = [center_heatmap_pred, wh_pred, offset_pred, tracking_pred, ltrb_amodal_pred]
-            result_list = self.detector.bbox_head.get_bboxes(
-                # todo Are outs always tensors?
-                *[[tensor] for tensor in outs], img_metas=img_metas)
-            # TODO: support batch inference
+        outs = [center_heatmap_pred, wh_pred, offset_pred, tracking_pred, ltrb_amodal_pred]
+        result_list = self.detector.bbox_head.get_bboxes(
+            # todo Are outs always tensors?
+            *[[tensor] for tensor in outs], img_metas=img_metas)
+        # TODO: support batch inference
         det_bboxes = result_list[0][0]
         det_labels = result_list[0][1]
         det_bboxes_with_motion = result_list[0][2]
         det_bboxes_input = result_list[0][3]
         num_classes = self.detector.bbox_head.num_classes
         self.ref_img = img
+        # reformat public dets
+        if public_bboxes is not None:
+            assert public_labels is not None and public_scores is not None
+            public_labels = public_labels[0][0]
+            public_bboxes = torch.cat((public_bboxes[0][0],public_scores[0][0].unsqueeze(-1)),-1)
         bboxes, labels, ids = self.tracker.track(
             bboxes_input=det_bboxes_input,
             bboxes=det_bboxes,
             bboxes_with_motion=det_bboxes_with_motion,
             labels=det_labels,
-            frame_id=frame_id)
+            frame_id=frame_id,
+            public_bboxes=public_bboxes,
+            public_labels=public_labels)
         track_result = track2result(bboxes, labels, ids, num_classes)
         bbox_result = bbox2result(det_bboxes, det_labels, num_classes)
         return dict(bbox_results=bbox_result, track_results=track_result)
