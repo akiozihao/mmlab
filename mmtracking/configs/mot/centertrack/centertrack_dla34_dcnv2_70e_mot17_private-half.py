@@ -66,7 +66,7 @@ test_pipeline = [
 data_root = '../data/mot17-frcnn/'
 data = dict(
     samples_per_gpu=4,
-    workers_per_gpu=0,
+    workers_per_gpu=2,
     train=dict(
         _delete_=True,
         type='RepeatDataset',
@@ -124,7 +124,17 @@ model = dict(
         test_cfg=dict(topk=100, local_maximum_kernel=3, max_per_img=100),
         train_cfg=dict(fp_disturb=0.1, lost_disturb=0.4, hm_disturb=0.05)
     ),
-    tracker=dict(type='CTTracker')
+    tracker=dict(type='CTTracker',
+                 obj_score_thr=0.4,
+                 num_frames_retain=3,
+                 momentums=dict(
+                     ids=1,
+                     bboxes_input=1,
+                     bboxes=1,
+                     cts=1,
+                     labels=1,
+                     frame_ids=1,
+                 ))
 )
 
 # optimizer

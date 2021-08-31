@@ -35,7 +35,7 @@ class CenterTrack(BaseMultiObjectTracker):
                     public_scores=None,
                     **kwargs):
         frame_id = img_metas[0]['frame_id']
-        pre_active_bboxes_input = self.tracker.pre_active_bboxes_input
+        pre_active_bboxes_input = self.tracker.pre_active_bboxes_input(frame_id)
         if pre_active_bboxes_input is not None:
             pre_active_bboxes_input = pre_active_bboxes_input[pre_active_bboxes_input[:, -1] > self.pre_thresh]
         if frame_id == 0:

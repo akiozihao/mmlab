@@ -31,7 +31,6 @@ class CTTracker(BaseTracker):
         item_size = (bboxes[:, 3] - bboxes[:, 1]) * (bboxes[:, 2] - bboxes[:, 0])  # N
         ids = torch.full((bboxes.size(0),), -1, dtype=torch.long)
         pre_bboxes = self.pre_bboxes
-        M = pre_bboxes.shape[0]
         N = bboxes.shape[0]
         if self.empty or bboxes.size(0) == 0 or pre_bboxes is None:
             if public_bboxes is not None:
@@ -43,6 +42,13 @@ class CTTracker(BaseTracker):
                     self.num_tracks,
                     self.num_tracks + p_matched_indices.shape[0],
                     dtype=torch.long)
+
+                matched = ids != -1
+
+                ids = ids[matched]
+                bboxes_input = bboxes_input[matched]
+                bboxes = bboxes[matched]
+                labels = labels[matched]
                 self.num_tracks += p_matched_indices.shape[0]
             else:
                 num_new_tracks = bboxes.size(0)
@@ -52,11 +58,10 @@ class CTTracker(BaseTracker):
                     dtype=torch.long)
                 self.num_tracks += num_new_tracks
         else:
+            M = pre_bboxes.shape[0]
             track_size = (pre_bboxes[:, 3] - pre_bboxes[:, 1]) * \
                          (pre_bboxes[:, 2] - pre_bboxes[:, 0])  # M
-            # dist = torch.cdist(det_centers, self.pre_centers, 2)
-            dist = (((self.pre_cts.reshape(1, -1, 2) - \
-                      det_centers_with_motion.reshape(-1, 1, 2)) ** 2).sum(axis=2))
+            dist = torch.cdist(det_centers_with_motion, self.pre_cts, 2)
             # invalid
             invalid = ((dist > track_size.reshape(1, M)) + \
                        (dist > item_size.reshape(N, 1)) + \
@@ -65,7 +70,6 @@ class CTTracker(BaseTracker):
             matched_indices = self._greedy_assignment(dist)
             # pre_ids = self.pre_ids
             ids[matched_indices[:, 0]] = self.pre_ids[matched_indices[:, 1]]
-            new_track_inds = ids == -1
 
             # public detection
             if public_bboxes is not None:
@@ -78,8 +82,16 @@ class CTTracker(BaseTracker):
                     self.num_tracks,
                     self.num_tracks + p_matched_indices.shape[0],
                     dtype=torch.long)
-                self.num_tracks += p_matched_indices.shape[0]
+
+                matched = ids != -1
+
+                ids = ids[matched]
+                bboxes_input = bboxes_input[matched]
+                bboxes = bboxes[matched]
+                labels = labels[matched]
+                self.num_tracks += bboxes.shape[0]
             else:
+                new_track_inds = ids == -1
                 ids[new_track_inds] = torch.arange(
                     self.num_tracks,
                     self.num_tracks + new_track_inds.sum(),
@@ -96,45 +108,44 @@ class CTTracker(BaseTracker):
 
     @property
     def bboxes_input(self):
-        bboxes = [track['bboxes_input'][-1] for id, track in self.tracks.items()]
+        bboxes = [track['bboxes_input'] for id, track in self.tracks.items()]
         if len(bboxes) == 0:
             return None
         return torch.cat(bboxes, 0)
 
-    @property
-    def pre_active_bboxes_input(self):
+    def pre_active_bboxes_input(self,frame_id):
         bboxes = []
         for id, track in self.tracks.items():
-            if track['active'][-1] == 1:
-                bboxes.append(track['bboxes_input'][-1])
+            if frame_id - track['frame_ids'] == 1:
+                bboxes.append(track['bboxes_input'])
         if len(bboxes) == 0:
             return None
         return torch.cat(bboxes, 0)
 
     @property
     def pre_bboxes(self):
-        bboxes = [track['bboxes'][-1] for id, track in self.tracks.items()]
+        bboxes = [track['bboxes'] for id, track in self.tracks.items()]
         if len(bboxes) == 0:
             return None
         return torch.cat(bboxes, 0)
 
     @property
     def pre_cts(self):
-        cts = [track['cts'][-1] for id, track in self.tracks.items()]
+        cts = [track['cts'] for id, track in self.tracks.items()]
         if len(cts) == 0:
             return None
         return torch.cat(cts, 0)
 
     @property
     def pre_labels(self):
-        labels = [track['labels'][-1] for id, track in self.tracks.items()]
+        labels = [track['labels'] for id, track in self.tracks.items()]
         if len(labels) == 0:
             return None
         return torch.cat(labels, 0)
 
     @property
     def pre_ids(self):
-        ids = [track['ids'][-1] for id, track in self.tracks.items()]
+        ids = [track['ids'] for id, track in self.tracks.items()]
         if len(ids) == 0:
             return None
         return torch.cat(ids, 0)
