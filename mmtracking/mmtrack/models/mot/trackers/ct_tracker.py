@@ -49,6 +49,7 @@ class CTTracker(BaseTracker):
                 bboxes_input = bboxes_input[matched]
                 bboxes = bboxes[matched]
                 labels = labels[matched]
+
                 self.num_tracks += p_matched_indices.shape[0]
             else:
                 num_new_tracks = bboxes.size(0)
@@ -74,6 +75,7 @@ class CTTracker(BaseTracker):
             # public detection
             if public_bboxes is not None:
                 p_dist = torch.cdist(det_centers_with_motion, self._xyxy2center(public_bboxes))
+                # Filter out bbox matched with previous frame
                 p_dist[matched_indices[:, 0], :] += 1e18
                 p_invalid = p_dist > item_size.reshape(N, 1)
                 p_dist += p_invalid * 1e18
@@ -89,7 +91,7 @@ class CTTracker(BaseTracker):
                 bboxes_input = bboxes_input[matched]
                 bboxes = bboxes[matched]
                 labels = labels[matched]
-                self.num_tracks += bboxes.shape[0]
+                self.num_tracks += p_matched_indices.shape[0]
             else:
                 new_track_inds = ids == -1
                 ids[new_track_inds] = torch.arange(
@@ -165,5 +167,4 @@ class CTTracker(BaseTracker):
             if dist[i][j] < 1e16:
                 dist[:, j] = 1e18
                 matched_indices.append([i, j])
-        return np.array(matched_indices, np.int32).reshape(-1, 2
-)
+        return np.array(matched_indices, np.int32).reshape(-1, 2)
