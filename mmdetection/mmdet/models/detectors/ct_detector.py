@@ -1,7 +1,7 @@
 import torch
+
 from mmdet.models.builder import DETECTORS
 from mmdet.models.utils import gen_gaussian_target, gaussian_radius
-
 from .single_stage import SingleStageDetector
 
 
@@ -107,16 +107,6 @@ class CTDetector(SingleStageDetector):
                 continue
             radius = gaussian_radius([torch.ceil(scale_box_h), torch.ceil(scale_box_w)], min_overlap=0.3)
             radius = max(0, int(radius))
-
-            # ct[0] = torch.ceil(ct[0] + torch.randn(1,device=bboxes.device) * self.bbox_head.hm_disturb * scale_box_w)
-            # ct[1] = torch.ceil(ct[1] + torch.randn(1,device=bboxes.device) * self.bbox_head.hm_disturb * scale_box_h)
             gen_gaussian_target(heatmap[0, 0],
                                 ct.int(), radius)
-            # if random.random() < self.bbox_head.fp_disturb:
-            #     ct2 = ct.clone()
-            #     ct2[0] = ct2[0] + random.random() * 0.05 * scale_box_w
-            #     ct2[1] = ct2[1] + random.random() * 0.05 * scale_box_h
-            #     ctx2_int, cty2_int = ct2.int()
-            #     gen_gaussian_target(heatmap[0, 0], [ctx2_int, cty2_int], radius)
-
         return heatmap

@@ -17,7 +17,8 @@ class CTTracker(BaseTracker):
     def track(self,
               bboxes_input,
               bboxes,
-              bboxes_with_motion,
+              det_centers,
+              det_tracking_offset,
               labels,
               frame_id,
               public_bboxes,
@@ -25,8 +26,9 @@ class CTTracker(BaseTracker):
         valid_inds = bboxes[:, -1] > self.obj_score_thr
         bboxes_input = bboxes_input[valid_inds]
         bboxes = bboxes[valid_inds]
-        bboxes_with_motion = bboxes_with_motion[valid_inds]
-        det_centers_with_motion = self._xyxy2center(bboxes_with_motion)
+        det_centers = det_centers[valid_inds]
+        det_tracking_offset = det_tracking_offset[valid_inds]
+        det_centers_with_motion = det_centers + det_tracking_offset
         labels = labels[valid_inds]
         item_size = (bboxes[:, 3] - bboxes[:, 1]) * (bboxes[:, 2] - bboxes[:, 0])  # N
         ids = torch.full((bboxes.size(0),), -1, dtype=torch.long)
@@ -34,7 +36,7 @@ class CTTracker(BaseTracker):
         N = bboxes.shape[0]
         if self.empty or bboxes.size(0) == 0 or pre_bboxes is None:
             if public_bboxes is not None:
-                p_dist = torch.cdist(det_centers_with_motion, self._xyxy2center(public_bboxes))
+                p_dist = torch.pow(torch.cdist(det_centers_with_motion, self._xyxy2center(public_bboxes),2),2)
                 p_invalid = p_dist > item_size.reshape(N, 1)
                 p_dist += p_invalid * 1e18
                 p_matched_indices = self._greedy_assignment(p_dist)
@@ -49,7 +51,7 @@ class CTTracker(BaseTracker):
                 bboxes_input = bboxes_input[matched]
                 bboxes = bboxes[matched]
                 labels = labels[matched]
-
+                det_centers = det_centers[matched]
                 self.num_tracks += p_matched_indices.shape[0]
             else:
                 num_new_tracks = bboxes.size(0)
@@ -62,7 +64,7 @@ class CTTracker(BaseTracker):
             M = pre_bboxes.shape[0]
             track_size = (pre_bboxes[:, 3] - pre_bboxes[:, 1]) * \
                          (pre_bboxes[:, 2] - pre_bboxes[:, 0])  # M
-            dist = torch.cdist(det_centers_with_motion, self.pre_cts, 2)
+            dist = torch.pow(torch.cdist(det_centers_with_motion, self.pre_cts, 2),2)
             # invalid
             invalid = ((dist > track_size.reshape(1, M)) + \
                        (dist > item_size.reshape(N, 1)) + \
@@ -74,10 +76,10 @@ class CTTracker(BaseTracker):
 
             # public detection
             if public_bboxes is not None:
-                p_dist = torch.cdist(self._xyxy2center(public_bboxes),det_centers_with_motion)
+                p_dist = torch.pow(torch.cdist(self._xyxy2center(public_bboxes), det_centers_with_motion,2),2)
                 # Filter out bbox matched with previous frame
-                p_dist[:,matched_indices[:, 0]] += 1e18
-                p_invalid = p_dist > item_size.reshape(1,N)
+                p_dist[:, matched_indices[:, 0]] += 1e18
+                p_invalid = p_dist > item_size.reshape(1, N)
                 p_dist += p_invalid * 1e18
                 p_matched_indices = self._greedy_assignment(p_dist)
                 ids[p_matched_indices[:, 1]] = torch.arange(
@@ -91,6 +93,7 @@ class CTTracker(BaseTracker):
                 bboxes_input = bboxes_input[matched]
                 bboxes = bboxes[matched]
                 labels = labels[matched]
+                det_centers = det_centers[matched]
                 self.num_tracks += p_matched_indices.shape[0]
             else:
                 new_track_inds = ids == -1
@@ -103,7 +106,7 @@ class CTTracker(BaseTracker):
             ids=ids,
             bboxes_input=bboxes_input,
             bboxes=bboxes,
-            cts=self._xyxy2center(bboxes),
+            cts=det_centers,
             labels=labels,
             frame_ids=frame_id)
         return bboxes, labels, ids
@@ -115,7 +118,7 @@ class CTTracker(BaseTracker):
             return None
         return torch.cat(bboxes, 0)
 
-    def pre_active_bboxes_input(self,frame_id):
+    def pre_active_bboxes_input(self, frame_id):
         bboxes = []
         for id, track in self.tracks.items():
             if frame_id - track['frame_ids'] == 1:

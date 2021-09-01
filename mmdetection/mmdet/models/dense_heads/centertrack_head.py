@@ -1,9 +1,10 @@
 import torch
+from torch import nn
+
 from mmdet.models import HEADS, build_loss
 from mmdet.models.dense_heads.centernet_head import CenterNetHead
 from mmdet.models.utils.gaussian_target import get_local_maximum, get_topk_from_heatmap, transpose_and_gather_feat, \
     gaussian_radius, gen_gaussian_target
-from torch import nn
 
 
 @HEADS.register_module()
@@ -237,7 +238,7 @@ class CenterTrackHead(CenterNetHead):
 
         invert_transfrom = [img_meta['invert_transform'] for img_meta in img_metas]
 
-        batch_det_bboxes, batch_labels, batch_gt_bboxes_with_motion = self.decode_heatmap(
+        batch_det_bboxes, batch_labels, batch_centers, tracking_offset = self.decode_heatmap(
             center_heatmap_preds[0],
             wh_preds[0],
             offset_preds[0],
@@ -253,12 +254,12 @@ class CenterTrackHead(CenterNetHead):
                                                                        invert_transfrom[batch_id])
             batch_det_bboxes[batch_id, :, 2:-1] = self._affine_transform(batch_det_bboxes[batch_id, :, 2:-1],
                                                                          invert_transfrom[batch_id])
-            batch_gt_bboxes_with_motion[batch_id, :, :2] = self._affine_transform(
-                batch_gt_bboxes_with_motion[batch_id, :, :2],
-                invert_transfrom[batch_id])
-            batch_gt_bboxes_with_motion[batch_id, :, 2:-1] = self._affine_transform(
-                batch_gt_bboxes_with_motion[batch_id, :, 2:-1],
-                invert_transfrom[batch_id])
+            batch_centers[batch_id, :, :] = self._affine_transform(batch_centers[batch_id, :, :],
+                                                                   invert_transfrom[batch_id])
+            offset_transform = invert_transfrom[batch_id].copy()
+            offset_transform[:, -1] = 0
+            tracking_offset[batch_id, :, :] = self._affine_transform(tracking_offset[batch_id, :, :],
+                                                                     offset_transform)
 
         if with_nms:  # todo
             det_results = []
@@ -273,7 +274,7 @@ class CenterTrackHead(CenterNetHead):
         else:
             det_results = [
                 tuple(bs) for bs in
-                zip(batch_det_bboxes, batch_labels, batch_gt_bboxes_with_motion, batch_det_bboxes_input)
+                zip(batch_det_bboxes, batch_labels, batch_det_bboxes_input, batch_centers, tracking_offset)
             ]
         return det_results
 
@@ -286,23 +287,6 @@ class CenterTrackHead(CenterNetHead):
                        img_shape,
                        k=100,
                        kernel=3):
-        """Transform outputs into detections raw bbox prediction.
-        Args:
-            center_heatmap_pred (Tensor): center predict heatmap,
-               shape (B, num_classes, H, W).
-            wh_pred (Tensor): wh predict, shape (B, 2, H, W).
-            offset_pred (Tensor): offset predict, shape (B, 2, H, W).
-            img_shape (list[int]): image shape in [h, w] format.
-            k (int): Get top k center keypoints from heatmap. Default 100.
-            kernel (int): Max pooling kernel for extract local maximum pixels.
-               Default 3.
-        Returns:
-            tuple[torch.Tensor]: Decoded output of CenterNetHead, containing
-               the following Tensors:
-              - batch_bboxes (Tensor): Coords of each box with shape (B, k, 5)
-              - batch_topk_labels (Tensor): Categories of each box with \
-                  shape (B, k)
-        """
         height, width = center_heatmap_pred.shape[2:]
         inp_h, inp_w = img_shape
 
@@ -315,44 +299,28 @@ class CenterTrackHead(CenterNetHead):
 
         offset = transpose_and_gather_feat(offset_pred, batch_index)
         ltrb = transpose_and_gather_feat(ltrb_amodal_preds, batch_index)
-        # centers
-        topk_xs = topk_xs0 + offset[..., 0]
-        topk_ys = topk_ys0 + offset[..., 1]
         tracking_offset = transpose_and_gather_feat(tracking_pred, batch_index)
-        with_motion_topk_xs = topk_xs + tracking_offset[..., 0]
-        with_motion_topk_ys = topk_ys + tracking_offset[..., 1]
-        with_motion_topk_xs0 = topk_xs0 + tracking_offset[..., 0]
-        with_motion_topk_ys0 = topk_ys0 + tracking_offset[..., 1]
         if self.use_ltrb:
             tl_x = (topk_xs0 + ltrb[..., 0]) * (inp_w / width)
             tl_y = (topk_ys0 + ltrb[..., 1]) * (inp_h / height)
             br_x = (topk_xs0 + ltrb[..., 2]) * (inp_w / width)
             br_y = (topk_ys0 + ltrb[..., 3]) * (inp_h / height)
-            # ref bboxes
-            with_motion_tl_x = (with_motion_topk_xs0 + ltrb[..., 0]) * (inp_w / width)
-            with_motion_tl_y = (with_motion_topk_ys0 + ltrb[..., 1]) * (inp_h / height)
-            with_motion_br_x = (with_motion_topk_xs0 + ltrb[..., 2]) * (inp_w / width)
-            with_motion_br_y = (with_motion_topk_ys0 + ltrb[..., 3]) * (inp_h / height)
         else:
             wh = transpose_and_gather_feat(wh_pred, batch_index)
             wh[wh < 0] = 0
+            topk_xs = topk_xs0 + offset[..., 0]
+            topk_ys = topk_ys0 + offset[..., 1]
             tl_x = (topk_xs - wh[..., 0] / 2) * (inp_w / width)
             tl_y = (topk_ys - wh[..., 1] / 2) * (inp_h / height)
             br_x = (topk_xs + wh[..., 0] / 2) * (inp_w / width)
             br_y = (topk_ys + wh[..., 1] / 2) * (inp_h / height)
-            # ref bboxes
-            with_motion_tl_x = (with_motion_topk_xs - wh[..., 0] / 2) * (inp_w / width)
-            with_motion_tl_y = (with_motion_topk_ys - wh[..., 1] / 2) * (inp_h / height)
-            with_motion_br_x = (with_motion_topk_xs + wh[..., 0] / 2) * (inp_w / width)
-            with_motion_br_y = (with_motion_topk_ys + wh[..., 1] / 2) * (inp_h / height)
         batch_bboxes = torch.stack([tl_x, tl_y, br_x, br_y], dim=2)
         batch_bboxes = torch.cat((batch_bboxes, batch_scores[..., None]),
                                  dim=-1)
-        with_motion_batch_bboxes = torch.stack([with_motion_tl_x, with_motion_tl_y, with_motion_br_x, with_motion_br_y],
-                                               dim=2)
-        with_motion_batch_bboxes = torch.cat((with_motion_batch_bboxes, batch_scores[..., None]),
-                                             dim=-1)
-        return batch_bboxes, batch_topk_labels, with_motion_batch_bboxes
+        batch_centers = torch.stack([topk_xs0 * (inp_w / width), topk_ys0 * (inp_h / height)], dim=2)
+        tracking_offset[:, :, 0] *= inp_w / width
+        tracking_offset[:, :, 1] *= inp_h / height
+        return batch_bboxes, batch_topk_labels, batch_centers, tracking_offset
 
     def get_public_bboxes(self,
                           center_heatmap_pred,

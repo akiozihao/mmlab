@@ -1,8 +1,8 @@
 import torch
+
 from mmdet.core import bbox2result
 from mmdet.models import build_detector
 from mmtrack.core import track2result
-
 from .base import BaseMultiObjectTracker
 from ..builder import MODELS, build_tracker
 
@@ -74,19 +74,21 @@ class CenterTrack(BaseMultiObjectTracker):
         # TODO: support batch inference
         det_bboxes = result_list[0][0]
         det_labels = result_list[0][1]
-        det_bboxes_with_motion = result_list[0][2]
-        det_bboxes_input = result_list[0][3]
+        det_bboxes_input = result_list[0][2]
+        det_centers = result_list[0][3]
+        det_tracking_offset = result_list[0][4]
         num_classes = self.detector.bbox_head.num_classes
         self.ref_img = img
         # reformat public dets
         if public_bboxes is not None:
             assert public_labels is not None and public_scores is not None
             public_labels = public_labels[0][0]
-            public_bboxes = torch.cat((public_bboxes[0][0],public_scores[0][0].unsqueeze(-1)),-1)
+            public_bboxes = torch.cat((public_bboxes[0][0], public_scores[0][0].unsqueeze(-1)), -1)
         bboxes, labels, ids = self.tracker.track(
             bboxes_input=det_bboxes_input,
             bboxes=det_bboxes,
-            bboxes_with_motion=det_bboxes_with_motion,
+            det_centers=det_centers,
+            det_tracking_offset=det_tracking_offset,
             labels=det_labels,
             frame_id=frame_id,
             public_bboxes=public_bboxes,
