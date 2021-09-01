@@ -23,7 +23,7 @@ test_pipeline = [
         ]
     )
 ]
-data_root = '../data/mot17-mini/'
+data_root = '../data/mot17-frcnn/'
 data = dict(
     val=dict(ann_file=data_root + 'annotations/half-val_cocoformat.json',
              img_prefix=data_root + 'train',
