@@ -23,10 +23,14 @@ test_pipeline = [
         ]
     )
 ]
-data_root = '../data/mot17-frcnn/'
+data_root = '../data/mot17-mini/'
 data = dict(
-    val=dict(detection_file=data_root + 'annotations/half-val_detections.pkl',
+    val=dict(ann_file=data_root + 'annotations/half-val_cocoformat.json',
+             img_prefix=data_root + 'train',
+             detection_file=data_root + 'annotations/half-val_detections.pkl',
              pipeline=test_pipeline),
-    test=dict(detection_file=data_root + 'annotations/half-val_detections.pkl',
+    test=dict(ann_file=data_root + 'annotations/half-val_cocoformat.json',
+              img_prefix=data_root + 'train',
+              detection_file=data_root + 'annotations/half-val_detections.pkl',
               pipeline=test_pipeline)
 )
