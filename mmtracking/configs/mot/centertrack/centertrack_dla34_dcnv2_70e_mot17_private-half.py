@@ -122,7 +122,8 @@ model = dict(
             feat_channel=256,
         ),
         test_cfg=dict(topk=100, local_maximum_kernel=3, max_per_img=100),
-        train_cfg=dict(fp_disturb=0.1, lost_disturb=0.4, hm_disturb=0.05)
+        train_cfg=dict(fp_disturb=0.1, lost_disturb=0.4, hm_disturb=0.05),
+        use_origin_gaussian_radius=False,
     ),
     tracker=dict(type='CTTracker',
                  obj_score_thr=0.4,

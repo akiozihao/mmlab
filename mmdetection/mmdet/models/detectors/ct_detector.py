@@ -1,8 +1,33 @@
+import math
+
 import torch
 
 from mmdet.models.builder import DETECTORS
 from mmdet.models.utils import gen_gaussian_target, gaussian_radius
 from .single_stage import SingleStageDetector
+
+
+def origin_gaussian_radius(det_size, min_overlap=0.7):
+    height, width = det_size
+
+    a1 = 1
+    b1 = (height + width)
+    c1 = width * height * (1 - min_overlap) / (1 + min_overlap)
+    sq1 = math.sqrt(b1 ** 2 - 4 * a1 * c1)
+    r1 = (b1 + sq1) / 2
+
+    a2 = 4
+    b2 = 2 * (height + width)
+    c2 = (1 - min_overlap) * width * height
+    sq2 = math.sqrt(b2 ** 2 - 4 * a2 * c2)
+    r2 = (b2 + sq2) / 2
+
+    a3 = 4 * min_overlap
+    b3 = -2 * min_overlap * (height + width)
+    c3 = (min_overlap - 1) * width * height
+    sq3 = math.sqrt(b3 ** 2 - 4 * a3 * c3)
+    r3 = (b3 + sq3) / 2
+    return min(r1, r2, r3)
 
 
 @DETECTORS.register_module()
@@ -15,6 +40,7 @@ class CTDetector(SingleStageDetector):
                  test_cfg=None,
                  pretrained=None,
                  init_cfg=None,
+                 use_origin_gaussian_radius=False,
                  ):
         super(CTDetector, self).__init__(backbone, neck, bbox_head, train_cfg,
                                          test_cfg, pretrained, init_cfg)
@@ -22,7 +48,8 @@ class CTDetector(SingleStageDetector):
         self.hm_disturb = train_cfg['hm_disturb']
         self.lost_disturb = train_cfg['lost_disturb']
         self.num_classes = 1
-
+        self.gaussian_radius = origin_gaussian_radius if use_origin_gaussian_radius else gaussian_radius
+        self.overlap = 0.7 if use_origin_gaussian_radius else 0.3
     def extract_feat(self, img, pre_img, pre_hm):
         """Directly extract features from the backbone+neck."""
         x = self.backbone(img, pre_img, pre_hm)
@@ -62,7 +89,7 @@ class CTDetector(SingleStageDetector):
                 if ref_h <= 0 or ref_w <= 0:
                     continue
 
-                radius = gaussian_radius([torch.ceil(ref_h), torch.ceil(ref_w)], min_overlap=0.3)
+                radius = self.gaussian_radius([torch.ceil(ref_h), torch.ceil(ref_w)], min_overlap=self.overlap)
                 radius = max(0, int(radius))
 
                 ct0 = ref_centers[idx]
@@ -105,7 +132,7 @@ class CTDetector(SingleStageDetector):
             scale_box_w = (bboxes[j][2] - bboxes[j][0])
             if scale_box_h <= 0 or scale_box_w <= 0:
                 continue
-            radius = gaussian_radius([torch.ceil(scale_box_h), torch.ceil(scale_box_w)], min_overlap=0.3)
+            radius = self.gaussian_radius([torch.ceil(scale_box_h), torch.ceil(scale_box_w)], min_overlap=self.overlap)
             radius = max(0, int(radius))
             gen_gaussian_target(heatmap[0, 0],
                                 ct.int(), radius)
