@@ -533,7 +533,7 @@ class RandomShift:
                 bbox_w = bboxes[..., 2] - bboxes[..., 0]
                 bbox_h = bboxes[..., 3] - bboxes[..., 1]
                 valid_inds = (bbox_w > self.filter_thr_px) & (
-                    bbox_h > self.filter_thr_px)
+                        bbox_h > self.filter_thr_px)
                 # If the shift does not contain any gt-bbox area, skip this
                 # image.
                 if key == 'gt_bboxes' and not valid_inds.any():
@@ -734,7 +734,7 @@ class RandomCrop:
                  allow_negative_crop=False,
                  bbox_clip_border=True):
         if crop_type not in [
-                'relative_range', 'relative', 'absolute', 'absolute_range'
+            'relative_range', 'relative', 'absolute', 'absolute_range'
         ]:
             raise ValueError(f'Invalid crop_type {crop_type}.')
         if crop_type in ['absolute', 'absolute_range']:
@@ -797,7 +797,7 @@ class RandomCrop:
                 bboxes[:, 0::2] = np.clip(bboxes[:, 0::2], 0, img_shape[1])
                 bboxes[:, 1::2] = np.clip(bboxes[:, 1::2], 0, img_shape[0])
             valid_inds = (bboxes[:, 2] > bboxes[:, 0]) & (
-                bboxes[:, 3] > bboxes[:, 1])
+                    bboxes[:, 3] > bboxes[:, 1])
             # If the crop does not contain any gt-bbox area and
             # allow_negative_crop is False, skip this image.
             if (key == 'gt_bboxes' and not valid_inds.any()
@@ -814,7 +814,7 @@ class RandomCrop:
             if mask_key in results:
                 results[mask_key] = results[mask_key][
                     valid_inds.nonzero()[0]].crop(
-                        np.asarray([crop_x1, crop_y1, crop_x2, crop_y2]))
+                    np.asarray([crop_x1, crop_y1, crop_x2, crop_y2]))
 
         # crop semantic seg
         for key in results.get('seg_fields', []):
@@ -1243,7 +1243,7 @@ class MinIoURandomCrop:
                 # seg fields
                 for key in results.get('seg_fields', []):
                     results[key] = results[key][patch[1]:patch[3],
-                                                patch[0]:patch[2]]
+                                   patch[0]:patch[2]]
                 return results
 
     def __repr__(self):
@@ -1719,7 +1719,7 @@ class RandomCenterCropPad:
             cropped_center_y - top, cropped_center_y + bottom,
             cropped_center_x - left, cropped_center_x + right
         ],
-                          dtype=np.float32)
+            dtype=np.float32)
 
         return cropped_img, border, patch
 
@@ -1773,7 +1773,7 @@ class RandomCenterCropPad:
                         bboxes[:, 0:4:2] = np.clip(bboxes[:, 0:4:2], 0, new_w)
                         bboxes[:, 1:4:2] = np.clip(bboxes[:, 1:4:2], 0, new_h)
                     keep = (bboxes[:, 2] > bboxes[:, 0]) & (
-                        bboxes[:, 3] > bboxes[:, 1])
+                            bboxes[:, 3] > bboxes[:, 1])
                     bboxes = bboxes[keep]
                     results[key] = bboxes
                     if key in ['gt_bboxes']:
@@ -2590,3 +2590,178 @@ class RandomAffine:
     def _get_translation_matrix(x, y):
         translation_matrix = np.array([[1, 0., x], [0., 1, y], [0., 0., 1.]])
         return translation_matrix
+
+
+@PIPELINES.register_module()
+class RandomCenterAffine(object):
+    def __init__(self,
+                 crop_size=(544, 960),
+                 ratios=None,
+                 border=128,
+                 test_mode=False,
+                 ):
+        self.crop_size = crop_size
+        self.ratios = ratios
+        self.border = border
+        self.test_mode = test_mode
+
+    def _train_aug(self, results, ratio=None, center=None):
+        img = results['img']
+        bboxes = results['gt_bboxes']
+        h, w, c = img.shape
+        img_size = np.array([w, h], np.float32)
+        new_h = int(self.crop_size[0])
+        new_w = int(self.crop_size[1])
+        if center is not None:
+            assert ratio is not None
+            size_t = img_size * ratio
+        else:
+            center = img_size / 2
+            while True:
+                assert isinstance(self.ratios, list)
+                scale = random.choice(self.ratios)
+                new_h = int(self.crop_size[0] * scale)
+                new_w = int(self.crop_size[1] * scale)
+                h_border = self._get_border(self.border, h)
+                w_border = self._get_border(self.border, w)
+                has_bbox = True
+                for i in range(50):
+                    ct = img_size / 2
+                    ct[0] = np.random.randint(low=w_border, high=w - w_border)
+                    ct[1] = np.random.randint(low=h_border, high=h - h_border)
+                    size_t = img_size * scale
+                    trans_input = self._get_affine_transform(
+                        center, size_t, [new_w, new_h])
+                    bboxes_test = bboxes.copy()
+                    mask = np.zeros(len(bboxes_test), dtype=bool)
+                    for i, bbox_t in enumerate(bboxes_test):
+                        bbox_t[:2] = self._affine_transform(bbox_t[:2], trans_input)
+                        bbox_t[2:] = self._affine_transform(bbox_t[2:], trans_input)
+
+                        bbox_t[[0, 2]] = np.clip(bbox_t[[0, 2]], 0, new_w - 1)
+                        bbox_t[[1, 3]] = np.clip(bbox_t[[1, 3]], 0, new_h - 1)
+
+                        bbox_h, bbox_w = bbox_t[3] - bbox_t[1], bbox_t[2] - bbox_t[0]
+                        if bbox_h <= 0 or bbox_w <= 0:
+                            continue
+                        mask[i] = True
+                    if not mask.any():
+                        has_bbox = False
+                    else:
+                        center = ct
+                        break
+                if has_bbox:
+                    break
+        trans_input = self._get_affine_transform(
+            center, size_t, [new_w, new_h])
+        trans_input_inv = self._get_affine_transform(
+            center, size_t, [new_w, new_h], inv=1)
+        cropped_img = cv2.warpAffine(img, trans_input, (new_w, new_h), flags=cv2.INTER_LINEAR)
+        bboxes[:, :2] = self._affine_transform_bboxes(bboxes[:, :2], trans_input)
+        bboxes[:, 2:] = self._affine_transform_bboxes(bboxes[:, 2:], trans_input)
+        results['img'] = cropped_img
+        results['img_shape'] = cropped_img.shape
+        results['pad_shape'] = cropped_img.shape
+        results['gt_bboxes'] = bboxes
+        return results
+
+    def _test_aug(self, results):
+        img = results['img']
+        h, w, c = img.shape
+        img_size = np.array([w, h], np.float32)
+        ct = img_size / 2
+        new_h = int(self.crop_size[0])
+        new_w = int(self.crop_size[1])
+
+        trans_input = self._get_affine_transform(
+            ct, img_size, [new_w, new_h])
+        cropped_img = cv2.warpAffine(img, trans_input, (new_w, new_h), flags=cv2.INTER_LINEAR)
+
+        results['img'] = cropped_img
+        results['invert_transform'] = self._get_affine_transform(
+            ct, img_size, [new_w, new_h], inv=1)
+        return results
+
+    def _affine_transform(self, pt, t):
+        new_pt = np.array([pt[0], pt[1], 1.], dtype=np.float32).T
+        new_pt = np.dot(t, new_pt)
+        return new_pt[:2]
+
+    def _affine_transform_bboxes(self, bboxes, t):
+        new_bboxes = np.concatenate((bboxes, np.ones((bboxes.shape[0], 1))), axis=1)
+        new_bboxes = np.matmul(new_bboxes, t.T)
+        return new_bboxes
+
+    def _get_affine_transform(self,
+                              center,
+                              scale,  # todo change to width
+                              output_size,
+                              inv=0):
+        # if not isinstance(scale, np.ndarray) and not isinstance(scale, list):
+        #     scale = np.array([scale, scale], dtype=np.float32)
+        if not isinstance(output_size, np.ndarray):
+            output_size = np.array(output_size)
+
+        src_w = scale[0]
+        dst_w = output_size[0]
+        dst_h = output_size[1]
+        dst_center = output_size * 0.5
+
+        src_dir = np.array([0, src_w * -0.5], np.float32)
+        dst_dir = np.array([0, dst_w * -0.5], np.float32)
+
+        src = np.zeros((3, 2), dtype=np.float32)
+        dst = np.zeros((3, 2), dtype=np.float32)
+        src[0, :] = center
+        src[1, :] = center + src_dir
+        dst[0, :] = dst_center
+        dst[1, :] = dst_center + dst_dir
+
+        def get_3rd_point(a, b):
+            direct = a - b
+            return b + np.array([-direct[1], direct[0]], dtype=np.float32)
+
+        src[2:, :] = get_3rd_point(src[0, :], src[1, :])
+        dst[2:, :] = get_3rd_point(dst[0, :], dst[1, :])
+
+        if inv:
+            trans = cv2.getAffineTransform(dst, src)
+        else:
+            trans = cv2.getAffineTransform(src, dst)
+
+        return trans
+
+    def _get_border(self, border, size):
+        """Get final border for the target size.
+        This function generates a ``final_border`` according to image's shape.
+        The area between ``final_border`` and ``size - final_border`` is the
+        ``center range``. We randomly choose center from the ``center range``
+        to avoid our random center is too close to original image's border.
+        Also ``center range`` should be larger than 0.
+        Args:
+            border (int): The initial border, default is 128.
+            size (int): The width or height of original image.
+        Returns:
+            int: The final border.
+        """
+        k = 2 * border / size
+        i = pow(2, np.ceil(np.log2(np.ceil(k))) + (k == int(k)))
+        return border // i
+
+    def __call__(self, results):
+        """Call function to make a mixup of image.
+
+        Args:
+            results (dict): Result dict.
+
+        Returns:
+            dict: Result dict with RandomCenterAffine transformed.
+        """
+        img = results['img']
+        assert img.dtype == np.float32, (
+            'RandomCenterCropPad needs the input image of dtype np.float32,'
+            ' please set "to_float32=True" in "LoadImageFromFile" pipeline')
+        if self.test_mode:
+            return self._test_aug(results)
+        else:
+            return self._train_aug(results, self.center)

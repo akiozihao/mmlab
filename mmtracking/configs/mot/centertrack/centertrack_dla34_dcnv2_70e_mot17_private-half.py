@@ -3,6 +3,7 @@ custom_imports = dict(
              'mmdet.models.necks.dla_neck',
              'mmdet.models.dense_heads.centertrack_head',
              'mmdet.models.detectors.ct_detector',
+             'mmdet.datasets.pipelines.transforms',
              'mmtrack.models.mot.trackers.ct_tracker',
              'mmtrack.models.mot.center_track',
              'mmtrack.datasets.pipelines.transforms'],
@@ -51,7 +52,7 @@ test_pipeline = [
         flip=False,
         transforms=[
             dict(
-                type='SeqRandomCenterAffine',
+                type='RandomCenterAffine',
                 test_mode=True),
             dict(type='Normalize', **img_norm_cfg),
             dict(type='ImageToTensor', keys=['img']),
