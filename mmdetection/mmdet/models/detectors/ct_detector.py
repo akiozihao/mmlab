@@ -102,7 +102,6 @@ class CTDetector(SingleStageDetector):
                 ct_int = ct.int()
                 # disturb ref_bboxes
                 if conf == 0:
-                    # ref_centers[idx] = ct
                     ref_bboxes[batch_id][idx, [0, 2]] += ct[0] - ct0[0]
                     ref_bboxes[batch_id][idx, [1, 3]] += ct[1] - ct0[1]
                 gen_gaussian_target(ref_hm[batch_id, 0], ct_int, radius, k=conf)
