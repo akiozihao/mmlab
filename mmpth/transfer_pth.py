@@ -36,6 +36,7 @@ def transfer_pth(source_pth):
         elif type == 'hm' or type == 'reg' or type == 'wh' or type == 'tracking' or type == 'ltrb_amodal':
             nk, nv = trans_head(k, v)
         # if nk not in ignore:
+        nk = 'detector.' + nk
         dst_state_dict[nk] = nv
     for k, v in source.items():
         if k == 'state_dict':
@@ -119,4 +120,4 @@ new_pth_info = transfer_pth('/home/akio/dev/centertrack_origin/models/mot17_full
 for k,v in new_pth_info['state_dict'].items():
     print(k,v.shape)
 
-# torch.save(new_pth_info, 'new_model.pth')
+torch.save(new_pth_info, '../models/mmlab_mot17_fulltrain.pth')

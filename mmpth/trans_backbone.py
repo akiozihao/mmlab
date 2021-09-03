@@ -25,18 +25,17 @@ def trans_backbone(source_pth):
         if l_k[1] == 'root':
             if l_k[2] == 'bn':
                 l_k[2] = l_k[2] + '1'
-        if l_k[2] == 'root':
-            if l_k[3] == 'bn':
+        if len(l_k) > 2 and l_k[2] == 'root':
+            if len(l_k) > 3 and l_k[3] == 'bn':
                 l_k[3] = l_k[3] + '1'
         l_k =  '.'.join(str(i) for i in l_k)
         backbone_st[l_k] = v
     # save
-    torch.save(backbone_st,'backbone.pt')
-    # torch.save(neck_st,'neck.pt')
-    # torch.save(head_st,'head.pt')
+    torch.save(backbone_st,'../models/mmlab_dla34-ba72cf86.pth')
 
 
-trans_backbone('/home/akio/Downloads/crowdhuman_split/backbone.pt')
+
+trans_backbone('/home/akio/Downloads/dla34-ba72cf86.pth')
 
 for k,v in backbone_st.items():
     print(k,v.shape)
