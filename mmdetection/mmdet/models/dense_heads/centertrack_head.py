@@ -9,6 +9,23 @@ from mmdet.models.utils.gaussian_target import get_local_maximum, get_topk_from_
 
 @HEADS.register_module()
 class CenterTrackHead(CenterNetHead):
+    """
+
+    Args:
+        in_channel:
+        feat_channel:
+        num_classes:
+        use_ltrb:
+        loss_center_heatmap:
+        loss_offset:
+        loss_wh:
+        loss_tracking:
+        loss_ltrb_amodal:
+        init_cfg:
+        train_cfg:
+        test_cfg:
+    """
+
     def __init__(self,
                  in_channel,
                  feat_channel,
@@ -23,6 +40,7 @@ class CenterTrackHead(CenterNetHead):
                  init_cfg=None,
                  train_cfg=None,
                  test_cfg=None):
+
         super(CenterTrackHead, self).__init__(in_channel, feat_channel, num_classes,
                                               init_cfg=init_cfg,
                                               train_cfg=train_cfg,

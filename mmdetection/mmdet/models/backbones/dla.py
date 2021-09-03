@@ -1,19 +1,34 @@
 import torch
+from torch import nn
+
 from mmcv.cnn import ConvModule
 from mmcv.cnn import build_conv_layer, build_norm_layer
 from mmcv.runner import BaseModule
 from mmdet.models.builder import BACKBONES
-from torch import nn
 
 
 class DLABasicBlock(BaseModule):
+    """BasicBlock for Deep Layer Aggregation
+
+    Args:
+        inplanes (int): Number of input channels.
+        planes (int): Number of output channels.
+        stride (int | tuple[int]): Stride of the conv1.
+        dilation (int | tuple[int]: Spacing between kernel elements.
+        conv_cfg (dict): Config dict for convolution layers. Default: None,
+        which means using Conv2d.
+        norm_cfg (dict): Config dict for normalization layers. Default: None.
+        init_cfg (dict or list[dict], optional): Initialization config dict.
+            Default: None
+    """
+
     def __init__(self,
                  inplanes,
                  planes,
                  stride=1,
                  dilation=1,
                  conv_cfg=None,
-                 norm_cfg=dict(type='BN', momentum=0.1),
+                 norm_cfg=None,
                  init_cfg=None,
                  ):
         super(DLABasicBlock, self).__init__(init_cfg)
@@ -71,13 +86,27 @@ class DLABasicBlock(BaseModule):
 
 
 class Root(BaseModule):
+    """Root layer of the tree structure in Deep Layer Aggregation
+
+    Args:
+        inplanes (int): Number of input channels.
+        planes (int): Number of output channels.
+        kernel_size (int | tuple[int]): Size of the convolution kernel.
+        residual (bool): Whether to use residual.
+        conv_cfg (dict): Config dict for convolution layers. Default: None,
+        which means using Conv2d.
+        norm_cfg (dict): Config dict for normalization layers. Default: None.
+        init_cfg (dict or list[dict], optional): Initialization config dict.
+            Default: None
+    """
+
     def __init__(self,
                  inplanes,
                  planes,
                  kernel_size,
                  residual,
                  conv_cfg=None,
-                 norm_cfg=dict(type='BN', momentum=0.1),
+                 norm_cfg=None,
                  init_cfg=None):
         super(Root, self).__init__(init_cfg)
 
@@ -112,6 +141,26 @@ class Root(BaseModule):
 
 
 class Tree(BaseModule):
+    """Tree layer of the tree structure in Deep Layer Aggregation
+
+    Args:
+        levels (int): The level of current tree.
+        block (type): Block type.
+        inplanes (int): Number of input channels.
+        planes (int): Number of output channels.
+        stride (int | tuple[int]): Stride of the convolution. Default 1.
+        level_root (bool): Whether to use level_root. Default False.
+        root_dim (int): Root dimension. Default 0.
+        root_kernel_size (int | tuple[int]):  Size of the root convolution kernel. Default 1.
+        dilation (int | tuple[int]: Spacing between kernel elements.
+        root_residual (bool): Whether to use residual. Default False.
+        conv_cfg (dict): Config dict for convolution layers. Default: None,
+        which means using Conv2d.
+        norm_cfg (dict): Config dict for normalization layers. Default: None.
+        init_cfg (dict or list[dict], optional): Initialization config dict.
+            Default: None
+    """
+
     def __init__(self,
                  levels,
                  block,
@@ -124,9 +173,10 @@ class Tree(BaseModule):
                  dilation=1,
                  root_residual=False,
                  conv_cfg=None,
-                 norm_cfg=dict(type='BN', momentum=0.1),
+                 norm_cfg=None,
                  init_cfg=None
                  ):
+
         super(Tree, self).__init__(init_cfg)
         self.norm_cfg = norm_cfg
         if root_dim == 0:
@@ -223,16 +273,34 @@ class Tree(BaseModule):
 
 @BACKBONES.register_module()
 class DLA(BaseModule):
+    """Deep Layer Aggregation
+
+    Args:
+        levels (list[int]): Number of convolution layers at each level.
+        channels (list[int]): Number of channels at each level.
+        block (type): Block type. Default DLABasicBlock.
+        root_residual (bool): Whether to use residual. Default False.
+        use_pre_img (bool): Whether to use pre img. Default False.
+        use_pre_hm (bool): Whether to use pre heatmap. Default False.
+        conv_cfg (dict): Config dict for convolution layers. Default: None,
+        which means using Conv2d.
+        norm_cfg (dict): Config dict for normalization layers. Default: None.
+        init_cfg (dict or list[dict], optional): Initialization config dict.
+            Default: None
+    """
+
     def __init__(self,
                  levels,
                  channels,
                  block=DLABasicBlock,
-                 residual_root=False,
-                 use_pre_img=True, use_pre_hm=True,
+                 root_residual=False,
+                 use_pre_img=True,
+                 use_pre_hm=True,
                  conv_cfg=None,
-                 norm_cfg=dict(type='BN', momentum=0.1),
+                 norm_cfg=None,
                  init_cfg=None
                  ):
+
         super(DLA, self).__init__(init_cfg)
         self.conv_cfg = conv_cfg
         self.norm_cfg = norm_cfg
@@ -254,7 +322,7 @@ class DLA(BaseModule):
         self.level2 = Tree(
             levels[2], block, channels[1], channels[2], 2,
             level_root=False,
-            root_residual=residual_root,
+            root_residual=root_residual,
             conv_cfg=conv_cfg,
             norm_cfg=norm_cfg,
             init_cfg=init_cfg
@@ -262,7 +330,7 @@ class DLA(BaseModule):
         self.level3 = Tree(
             levels[3], block, channels[2], channels[3], 2,
             level_root=True,
-            root_residual=residual_root,
+            root_residual=root_residual,
             conv_cfg=conv_cfg,
             norm_cfg=norm_cfg,
             init_cfg=init_cfg
@@ -270,7 +338,7 @@ class DLA(BaseModule):
         self.level4 = Tree(
             levels[4], block, channels[3], channels[4], 2,
             level_root=True,
-            root_residual=residual_root,
+            root_residual=root_residual,
             conv_cfg=conv_cfg,
             norm_cfg=norm_cfg,
             init_cfg=init_cfg
@@ -278,7 +346,7 @@ class DLA(BaseModule):
         self.level5 = Tree(
             levels[5], block, channels[4], channels[5], 2,
             level_root=True,
-            root_residual=residual_root,
+            root_residual=root_residual,
             conv_cfg=conv_cfg,
             norm_cfg=norm_cfg,
             init_cfg=init_cfg

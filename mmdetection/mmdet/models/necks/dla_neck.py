@@ -10,15 +10,30 @@ from mmdet.models.builder import NECKS
 
 
 class IDAUp(BaseModule):
+    """Iterative Deep Aggregation Layer
+
+    Args:
+        planes (int): Number of output channels.
+        channels (List[int]): Number of input channels.
+        up_f (List[int]): Upsample factor.
+        use_dcn (boolt): Whether to use dcn. Default True.
+        conv_cfg (dict): Config dict for convolution layers. Default: None,
+        which means using Conv2d.
+        norm_cfg (dict): Config dict for normalization layers. Default: None.
+        init_cfg (dict or list[dict], optional): Initialization config dict.
+            Default: None
+    """
+
     def __init__(self,
                  planes,
                  channels,
                  up_f,
                  use_dcn=True,
                  conv_cfg=None,
-                 norm_cfg=dict(type='BN', momentum=0.1),
+                 norm_cfg=None,
                  init_cfg=None
                  ):
+
         super(IDAUp, self).__init__(init_cfg)
         self.use_dcn = use_dcn
         for i in range(1, len(channels)):
@@ -95,6 +110,20 @@ class IDAUp(BaseModule):
 
 
 class DLAUp(BaseModule):
+    """
+    Args:
+        startp (int): Layer number to start, which controls how many IDA layers participant in forward.
+        channels (list[int]): Number of channels.
+        scales (list[int]): Upsample factors.
+        in_channels (int): Number of input channels. Default None.
+        use_dcn (boolt): Whether to use dcn. Default True.
+        conv_cfg (dict): Config dict for convolution layers. Default: None,
+        which means using Conv2d.
+        norm_cfg (dict): Config dict for normalization layers. Default: None.
+        init_cfg (dict or list[dict], optional): Initialization config dict.
+            Default: None
+    """
+
     def __init__(self,
                  startp,
                  channels,
@@ -102,8 +131,9 @@ class DLAUp(BaseModule):
                  in_channels=None,
                  use_dcn=True,
                  conv_cfg=None,
-                 norm_cfg=dict(type='BN', momentum=0.1),
+                 norm_cfg=None,
                  init_cfg=None):
+
         super(DLAUp, self).__init__(init_cfg)
         self.startp = startp
         if in_channels is None:
@@ -114,7 +144,8 @@ class DLAUp(BaseModule):
         for i in range(len(channels) - 1):
             j = -i - 2
             setattr(self, 'ida_{}'.format(i),
-                    IDAUp(channels[j], in_channels[j:],
+                    IDAUp(channels[j],
+                          in_channels[j:],
                           scales[j:] // scales[j],
                           use_dcn=use_dcn,
                           conv_cfg=conv_cfg,
@@ -133,13 +164,25 @@ class DLAUp(BaseModule):
 
 @NECKS.register_module()
 class DLANeck(BaseModule):
+    """Deep Layer Aggregation Neck
+
+    Args:
+        channels (list[int]): Number of input channels.
+        down_ratio (int): Downsample ratio.
+        use_dcn (boolt): Whether to use dcn. Default True.
+        conv_cfg (dict): Config dict for convolution layers. Default: None,
+        which means using Conv2d.
+        norm_cfg (dict): Config dict for normalization layers. Default: None.
+        init_cfg (dict or list[dict], optional): Initialization config dict.
+            Default: None
+    """
 
     def __init__(self,
                  channels,
                  down_ratio,
                  use_dcn=True,
                  conv_cfg=None,
-                 norm_cfg=dict(type='BN', momentum=0.1),
+                 norm_cfg=None,
                  init_cfg=None):
         super(DLANeck, self).__init__(init_cfg)
         self.first_level = int(np.log2(down_ratio))
