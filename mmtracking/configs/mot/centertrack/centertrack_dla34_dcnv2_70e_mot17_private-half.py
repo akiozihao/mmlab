@@ -104,7 +104,6 @@ model = dict(
     init_cfg=dict(type='Pretrained', checkpoint='../models/mmlab_crowdhuman.pth'),  # here for mmlab checkpoints
     detector=dict(
         type='CTDetector',
-        # init_cfg=dict(type='Pretrained', checkpoint='../models/new_crowdhuman_mmdcn_head_neck.pth'),  # here for original models
         backbone=dict(
             type='DLA',
             levels=[1, 1, 1, 2, 2, 1],

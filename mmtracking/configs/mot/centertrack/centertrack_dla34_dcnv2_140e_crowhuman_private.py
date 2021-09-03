@@ -1,6 +1,5 @@
 _base_ = ['./centertrack_dla34_dcnv2_70e_mot17_private-half.py']
-data_root = '../data/crowdhuman/'
-mot_data_root = '../data/mot17-frcnn/'
+crowdhuman_data_root = '../data/crowdhuman/'
 img_norm_cfg = dict(
     mean=[104.01362, 114.034225, 119.916595], std=[73.60277, 69.89082, 70.91508], to_rgb=False)
 train_pipeline = [
@@ -41,11 +40,11 @@ model = dict(
 )
 data = dict(
     samples_per_gpu=8,
-    workers_per_gpu=0,
+    workers_per_gpu=2,
     train=dict(
         dataset=dict(
-            ann_file=data_root + 'annotations/train_cocoformat.json',
-            img_prefix=data_root + 'Images',
+            ann_file=crowdhuman_data_root + 'annotations/train_cocoformat.json',
+            img_prefix=crowdhuman_data_root + 'Images',
             ref_img_sampler=dict(
                 frame_range=0,
                 filter_key_img=False,
@@ -53,14 +52,6 @@ data = dict(
             pipeline=train_pipeline
         )
     ),
-    val=dict(
-        ann_file=mot_data_root + 'annotations/half-val_cocoformat.json',
-        img_prefix=data_root + 'train',
-    ),
-    test=dict(
-        ann_file=mot_data_root + 'annotations/half-val_cocoformat.json',
-        img_prefix=data_root + 'train',
-    )
 )
 
 lr_config = dict(
@@ -68,9 +59,9 @@ lr_config = dict(
     # warmup='linear',
     # warmup_iters=1000,
     # warmup_ratio=1.0 / 1000,
-    step=[90,120]
+    step=[90, 120]
 )
-optimizer = dict(lr=2.5e-4)  # 2.5e-4 for batch size 64 on 4 GPUs
+optimizer = dict(lr=2.5e-4 / 2)  # 2.5e-4 for batch size 64 on 4 GPUs
 
 total_epoch = 140
 
