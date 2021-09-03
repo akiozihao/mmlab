@@ -67,15 +67,6 @@ class CenterTrackHead(CenterNetHead):
         loss = self.loss(outs, gt_amodal_bboxes, gt_labels, feat_shape, img_shape, gt_match_indices, ref_bboxes)
         return loss
 
-    def init_weights(self):
-        """Initialize weights of the head."""
-        bias_init = bias_init_with_prob(0.1)
-        self.heatmap_head[-1].bias.data.fill_(bias_init)
-        for head in [self.wh_head, self.offset_head]:
-            for m in head.modules():
-                if isinstance(m, nn.Conv2d):
-                    normal_init(m, std=0.001)
-
     def _build_head(self, in_channel, feat_channel, out_channel):
         """Build head for each branch."""
         layer = nn.Sequential(
