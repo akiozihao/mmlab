@@ -852,27 +852,21 @@ class SeqRandomCenterAffine(RandomCenterAffine):
 
                     has_bbox = True
                     for idx, bboxes_t in enumerate(all_bboxes_t):
-                        mask = np.zeros(len(bboxes_t), dtype=bool)
+                        any_bbox = False
                         for i, bbox_t in enumerate(bboxes_t):
                             bbox_t[:2] = self._affine_transform(bbox_t[:2], trans_input)
                             bbox_t[2:] = self._affine_transform(bbox_t[2:], trans_input)
 
-                            # don't need
-                            bbox_test = bbox_t.copy()
-                            bbox_test[[0, 2]] = np.clip(bbox_test[[0, 2]], 0, new_w - 1)
-                            bbox_test[[1, 3]] = np.clip(bbox_test[[1, 3]], 0, new_h - 1)
-
-                            bbox_h, bbox_w = bbox_test[3] - bbox_test[1], bbox_test[2] - bbox_test[0]
+                            x1, x2 = np.clip(bbox_t[[0, 2]], 0, new_w - 1)
+                            y1, y2 = np.clip(bbox_t[[1, 3]], 0, new_h - 1)
+                            bbox_h, bbox_w = y2 - y1, x2 - x1
                             if bbox_h <= 0 or bbox_w <= 0:
                                 continue
-                            mask[i] = True
-                        # masks.append(mask)
-                        # if image do not have valid bbox, any crop patch is valid.
-                        if not mask.any():
-                            has_bbox = False
-                            # masks.clear()
+                            any_bbox = True
                             break
-                        # if no valid bbox, try another center
+                        has_bbox &= any_bbox
+                        if not has_bbox:
+                            break
                     if has_bbox:
                         center = ct
                         ratio = aug_scale
