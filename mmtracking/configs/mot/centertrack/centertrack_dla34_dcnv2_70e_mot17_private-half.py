@@ -115,6 +115,7 @@ model = dict(
             channels=[16, 32, 64, 128, 256, 512],
             down_ratio=4,
             use_dcn=True,
+            norm_cfg=dict(type='BN', momentum=0.1),
         ),
         bbox_head=dict(
             type='CenterTrackHead',
