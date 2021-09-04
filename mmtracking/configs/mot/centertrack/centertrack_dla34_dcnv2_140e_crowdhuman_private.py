@@ -9,7 +9,8 @@ train_pipeline = [
     dict(
         type='SeqRandomCenterAffine',
         crop_size=(512, 512),
-        ratios=(0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3)),
+        ratios=(0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3),
+        share_params=False),
     dict(
         type='SeqResize',
         img_scale=(512, 512),
