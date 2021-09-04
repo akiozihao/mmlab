@@ -49,7 +49,7 @@ def main():
         os.makedirs(args.output)
 
     sets = ['train', 'val']
-    vid_id, img_id, ann_id = 1, 1, 1
+    vid_id, img_id, ann_id, instance_id = 1, 1, 1, 1
 
     for subset in sets:
         ins_id = 0
@@ -86,14 +86,15 @@ def main():
                     mot_frame_id=frame_id)
                 infos = img2gts[img_name]
                 for gt in infos:
-                    gt.update(id=ann_id, image_id=img_id, instance_id=-1)
+                    gt.update(id=ann_id, image_id=img_id, instance_id=instance_id)
                     outputs['annotations'].append(gt)
                     ann_id += 1
+                    instance_id += 1
                 outputs['images'].append(image)
                 img_id += 1
             outputs['videos'].append(video)
             vid_id += 1
-            outputs['num_instances'] = -1
+            outputs['num_instances'] = instance_id
         print(f'{subset} has {ins_id} instances.')
         mmcv.dump(outputs, out_file)
         print(f'Done! Saved as {out_file}')

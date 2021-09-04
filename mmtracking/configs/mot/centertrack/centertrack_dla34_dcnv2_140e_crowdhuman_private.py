@@ -20,7 +20,7 @@ train_pipeline = [
     dict(type='SeqRandomFlip', share_params=True, flip_ratio=0.5),
     dict(type='SeqNormalize', **img_norm_cfg),
     dict(type='SeqPad', size_divisor=32),
-    dict(type='MatchInstances', skip_nomatch=False),
+    dict(type='MatchInstances', skip_nomatch=True),
     dict(
         type='VideoCollect',
         keys=[
