@@ -12,18 +12,18 @@ class CenterTrackHead(CenterNetHead):
     """
 
     Args:
-        in_channel:
-        feat_channel:
-        num_classes:
-        use_ltrb:
-        loss_center_heatmap:
-        loss_offset:
-        loss_wh:
-        loss_tracking:
-        loss_ltrb_amodal:
-        init_cfg:
-        train_cfg:
-        test_cfg:
+        in_channel (int): Number of channel in the input feature map.
+        feat_channel (int): Number of channel in the intermediate feature map.
+        num_classes (int): Number of categories excluding the background category. Default: 1.
+        use_ltrb (bool): Whether to use ltrb instead of wh to compute bbox from heatmap. Default: True.
+        loss_center_heatmap (dict | None): Config of center heatmap loss. Default: GaussianFocalLoss.
+        loss_wh (dict | None): Config of wh loss. Default: L1Loss.
+        loss_offset (dict | None): Config of offset loss. Default: L1Loss.
+        loss_tracking (dict | None): Config of tracking loss. Default: L1Loss.
+        loss_ltrb_amodal (dict | None): Config of ltrb_amodal loss. Default: L1Loss.
+        init_cfg (dict or list[dict], optional): Initialization config dict. Default: None
+        train_cfg (dict | None): Training config. Useless in CenterNet, but we keep this variable for SingleStageDetector. Default: None.
+        test_cfg (dict | None): Testing config of CenterNet. Default: None.
     """
 
     def __init__(self,
