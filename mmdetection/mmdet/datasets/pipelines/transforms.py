@@ -2618,7 +2618,7 @@ class RandomCenterAffine(object):
         else:
             center = img_size / 2
             while True:
-                assert isinstance(self.ratios, list)
+                assert isinstance(self.ratios, tuple)
                 scale = random.choice(self.ratios)
                 new_h = int(self.crop_size[0] * scale)
                 new_w = int(self.crop_size[1] * scale)
