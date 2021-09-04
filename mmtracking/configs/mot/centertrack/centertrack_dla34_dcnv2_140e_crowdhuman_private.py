@@ -63,6 +63,6 @@ lr_config = dict(
 )
 optimizer = dict(lr=2.5e-4 / 2)  # 2.5e-4 for batch size 64 on 4 GPUs
 
-total_epoch = 140
+total_epochs = 140
 
 checkpoint_config = dict(interval=20)
