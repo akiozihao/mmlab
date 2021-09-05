@@ -32,18 +32,20 @@ class CenterTrackHead(CenterNetHead):
                  num_classes=1,
                  use_ltrb=True,
                  loss_center_heatmap=dict(type='GaussianFocalLoss', loss_weight=1.0),
-                 loss_offset=dict(type='L1Loss', loss_weight=1.0),
                  loss_wh=dict(type='L1Loss', loss_weight=0.1),
+                 loss_offset=dict(type='L1Loss', loss_weight=1.0),
                  loss_tracking=dict(type='L1Loss', loss_weight=1.0),
                  loss_ltrb_amodal=dict(type='L1Loss', loss_weight=0.1),
                  init_cfg=None,
                  train_cfg=None,
                  test_cfg=None):
 
-        super(CenterTrackHead, self).__init__(in_channel, feat_channel, num_classes,
+        super(CenterTrackHead, self).__init__(in_channel,
+                                              feat_channel,
+                                              num_classes,
                                               loss_center_heatmap,
-                                              loss_offset,
                                               loss_wh,
+                                              loss_offset,
                                               init_cfg=init_cfg,
                                               train_cfg=train_cfg,
                                               test_cfg=test_cfg, )
