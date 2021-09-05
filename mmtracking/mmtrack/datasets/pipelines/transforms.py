@@ -809,6 +809,8 @@ class SeqRandomCenterAffine(RandomCenterAffine):
                  crop_size=(544, 960),
                  ratios=None,
                  border=128,
+                 scale=None,
+                 shift=None,
                  test_mode=False,
                  share_params=True):
         super(SeqRandomCenterAffine, self).__init__(crop_size,
@@ -840,9 +842,19 @@ class SeqRandomCenterAffine(RandomCenterAffine):
                 center = None
                 for i in range(50):
                     all_bboxes_t = copy.deepcopy(all_bboxes)
-                    ct[0] = np.random.randint(low=w_border, high=w - w_border)
-                    ct[1] = np.random.randint(low=h_border, high=h - h_border)
-                    aug_scale = np.random.choice(self.ratios)
+
+                    if self.ratios is None:
+                        s = img_size.max()
+                        sf = self.scale
+                        cf = self.shift
+                        ct[0] += s * np.clip(np.random.randn() * cf, -2 * cf, 2 * cf)
+                        ct[1] += s * np.clip(np.random.randn() * cf, -2 * cf, 2 * cf)
+                        aug_scale = np.clip(np.random.randn() * sf + 1, 1 - sf, 1 + sf)
+                    else:
+                        ct[0] = np.random.randint(low=w_border, high=w - w_border)
+                        ct[1] = np.random.randint(low=h_border, high=h - h_border)
+                        aug_scale = np.random.choice(self.ratios)
+
                     size_t = img_size * aug_scale
 
                     trans_input = self._get_affine_transform(

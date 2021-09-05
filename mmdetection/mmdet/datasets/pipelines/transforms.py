@@ -2598,10 +2598,14 @@ class RandomCenterAffine(object):
                  crop_size=(544, 960),
                  ratios=None,
                  border=128,
+                 scale=None,
+                 shift=None,
                  test_mode=False,
                  ):
         self.crop_size = crop_size
         self.ratios = ratios
+        self.scale = scale
+        self.shift = shift
         self.border = border
         self.test_mode = test_mode
 
@@ -2616,24 +2620,29 @@ class RandomCenterAffine(object):
             assert ratio is not None
             size_t = img_size * ratio
         else:
-            center = img_size / 2
             while True:
-                assert isinstance(self.ratios, tuple)
-                scale = random.choice(self.ratios)
-                new_h = int(self.crop_size[0] * scale)
-                new_w = int(self.crop_size[1] * scale)
                 h_border = self._get_border(self.border, h)
                 w_border = self._get_border(self.border, w)
-                has_bbox = True
                 for i in range(50):
                     ct = img_size / 2
-                    ct[0] = np.random.randint(low=w_border, high=w - w_border)
-                    ct[1] = np.random.randint(low=h_border, high=h - h_border)
-                    size_t = img_size * scale
+                    if self.ratios is None:
+                        s = img_size.max()
+                        sf = self.scale
+                        cf = self.shift
+                        ct[0] += s * np.clip(np.random.randn() * cf, -2 * cf, 2 * cf)
+                        ct[1] += s * np.clip(np.random.randn() * cf, -2 * cf, 2 * cf)
+                        aug_scale = np.clip(np.random.randn() * sf + 1, 1 - sf, 1 + sf)
+                    else:
+                        assert isinstance(self.ratios, tuple)
+                        ct[0] = np.random.randint(low=w_border, high=w - w_border)
+                        ct[1] = np.random.randint(low=h_border, high=h - h_border)
+                        aug_scale = random.choice(self.ratios)
+
+                    size_t = img_size * aug_scale
                     trans_input = self._get_affine_transform(
                         center, size_t, [new_w, new_h])
                     bboxes_test = bboxes.copy()
-                    mask = np.zeros(len(bboxes_test), dtype=bool)
+                    any_bbox = False
                     for i, bbox_t in enumerate(bboxes_test):
                         bbox_t[:2] = self._affine_transform(bbox_t[:2], trans_input)
                         bbox_t[2:] = self._affine_transform(bbox_t[2:], trans_input)
@@ -2644,13 +2653,12 @@ class RandomCenterAffine(object):
                         bbox_h, bbox_w = bbox_t[3] - bbox_t[1], bbox_t[2] - bbox_t[0]
                         if bbox_h <= 0 or bbox_w <= 0:
                             continue
-                        mask[i] = True
-                    if not mask.any():
-                        has_bbox = False
-                    else:
+                        any_bbox = True
+                        break
+                    if any_bbox:
                         center = ct
                         break
-                if has_bbox:
+                if center is not None:
                     break
         trans_input = self._get_affine_transform(
             center, size_t, [new_w, new_h])
