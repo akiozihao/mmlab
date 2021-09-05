@@ -18,7 +18,7 @@ test_pipeline = [
             dict(type='ImageToTensor', keys=['img']),
             dict(
                 type='VideoCollect',
-                meta_keys=('pad_shape', 'invert_transform'),
+                meta_keys=('pad_shape', 'invert_transform_affine'),
                 keys=['img', 'public_bboxes', 'public_labels', 'public_scores'])
         ]
     )

@@ -859,8 +859,8 @@ class SeqRandomCenterAffine(RandomCenterAffine):
 
                     trans_input = self._get_affine_transform(
                         ct, size_t, [new_w, new_h])
-                    trans_input_inv = self._get_affine_transform(
-                        ct, size_t, [new_w, new_h], inv=1)
+                    # trans_input_inv = self._get_affine_transform(
+                    #     ct, size_t, [new_w, new_h], inv=1)
 
                     has_bbox = True
                     for idx, bboxes_t in enumerate(all_bboxes_t):

@@ -247,7 +247,7 @@ class CenterTrackHead(CenterNetHead):
                    img_metas,
                    with_nms=False):
 
-        invert_transfrom = [img_meta['invert_transform'] for img_meta in img_metas]
+        invert_transfrom = [img_meta['invert_transform_affine'] for img_meta in img_metas]
 
         batch_det_bboxes, batch_labels, batch_centers, tracking_offset = self.decode_heatmap(
             center_heatmap_preds[0],
@@ -364,7 +364,7 @@ class CenterTrackHead(CenterNetHead):
         batch_det_bboxes_input = torch.cat((public_bboxes[0], public_scores[0].unsqueeze(-1)), -1)
         batch_det_bboxes = batch_det_bboxes_input.clone()
         bs = batch_det_bboxes.shape[0]
-        invert_tranform = img_metas[0]['invert_transform']
+        invert_tranform = img_metas[0]['invert_transform_affine']
         for batch_id in range(bs):
             batch_det_bboxes[batch_id, :, :2] = self._affine_transform(batch_det_bboxes[batch_id, :, :2],
                                                                        invert_tranform)

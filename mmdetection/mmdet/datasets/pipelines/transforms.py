@@ -2671,6 +2671,8 @@ class RandomCenterAffine(object):
         results['img_shape'] = cropped_img.shape
         results['pad_shape'] = cropped_img.shape
         results['gt_bboxes'] = bboxes
+        results['transform_affine'] = trans_input
+        results['invert_transform_affine'] = trans_input_inv
         return results
 
     def _test_aug(self, results):
@@ -2686,7 +2688,8 @@ class RandomCenterAffine(object):
         cropped_img = cv2.warpAffine(img, trans_input, (new_w, new_h), flags=cv2.INTER_LINEAR)
 
         results['img'] = cropped_img
-        results['invert_transform'] = self._get_affine_transform(
+        results['transform_affine'] = trans_input
+        results['invert_transform_affine'] = self._get_affine_transform(
             ct, img_size, [new_w, new_h], inv=1)
         return results
 
