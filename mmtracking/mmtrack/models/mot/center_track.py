@@ -24,8 +24,8 @@ class CenterTrack(BaseMultiObjectTracker):
         self.pre_thresh = pre_thresh
         self.use_pre_hm = use_pre_hm
 
-        self.pre_img = None
-        self.pre_hm = None
+        self.ref_img = None
+        self.ref_hm = None
 
     def simple_test(self,
                     img,
