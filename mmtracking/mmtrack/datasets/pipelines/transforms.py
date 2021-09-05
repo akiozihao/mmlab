@@ -816,6 +816,8 @@ class SeqRandomCenterAffine(RandomCenterAffine):
         super(SeqRandomCenterAffine, self).__init__(crop_size,
                                                     ratios,
                                                     border,
+                                                    scale,
+                                                    shift,
                                                     test_mode)
         self.share_params = share_params
 
