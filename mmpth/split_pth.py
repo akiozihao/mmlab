@@ -31,8 +31,7 @@ def split_pth(source_pth):
 
 split_pth('../new_model.pth')
 
-for k,v in backbone_st.items():
-    print(k,v.shape)
+for k, v in backbone_st.items():
+    print(k, v.shape)
 
 print('done')
-

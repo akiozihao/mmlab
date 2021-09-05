@@ -1,9 +1,10 @@
 import torch
-from CenterTrack.src.lib.model.networks.dla import BasicBlock, DLA as DLA_Ori
-from CenterTrack.src.lib.model.networks.dla import DLASeg
 from mmdet.models.backbones.dla import DLA
 from mmdet.models.dense_heads.centertrack_head import CenterTrackHead
 from mmdet.models.necks.dla_neck import DLANeck
+
+from CenterTrack.src.lib.model.networks.dla import DLA as DLA_Ori
+from CenterTrack.src.lib.model.networks.dla import BasicBlock, DLASeg
 
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = True
@@ -15,9 +16,12 @@ neck_path_ori = '/home/akio/Downloads/crowdhuman_split/neck.pt'
 opt_path = '/home/akio/Downloads/crowdhuman_split/opt.pt'
 head_path = '/home/akio/Downloads/crowdhuman_split/head.pt'
 
+
 def _sigmoid(x):
     y = torch.clamp(x.sigmoid_(), min=1e-4, max=1 - 1e-4)
     return y
+
+
 def _sigmoid_output(output):
     if 'hm' in output:
         output['hm'] = _sigmoid(output['hm'])
@@ -27,6 +31,7 @@ def _sigmoid_output(output):
         output['dep'] = 1. / (output['dep'].sigmoid() + 1e-6) - 1.
     return output
 
+
 opt = torch.load(opt_path)
 
 # input
@@ -34,14 +39,12 @@ x = torch.randn(1, 3, 544, 960)
 pre_img = torch.randn(1, 3, 544, 960)
 pre_hm = torch.randn(1, 1, 544, 960)
 # init backbone
-backbone = DLA(levels=[1, 1, 1, 2, 2, 1],
-               channels=[16, 32, 64, 128, 256, 512])
-backbone_ori = DLA_Ori([1, 1, 1, 2, 2, 1],
-                       [16, 32, 64, 128, 256, 512],
-                       block=BasicBlock, opt=opt)
+backbone = DLA(levels=[1, 1, 1, 2, 2, 1], channels=[16, 32, 64, 128, 256, 512])
+backbone_ori = DLA_Ori([1, 1, 1, 2, 2, 1], [16, 32, 64, 128, 256, 512],
+                       block=BasicBlock,
+                       opt=opt)
 # init neck
-neck = DLANeck(channels=[16, 32, 64, 128, 256, 512],
-               down_ratio=4)
+neck = DLANeck(channels=[16, 32, 64, 128, 256, 512], down_ratio=4)
 # init head
 head_convs = {
     'hm': [256],
@@ -50,19 +53,23 @@ head_convs = {
     'tracking': [256],
     'ltrb_amodal': [256]
 }
-heads = {
-    'hm': 1,
-    'reg': 2,
-    'wh': 2,
-    'tracking': 2,
-    'ltrb_amodal': 4
-}
+heads = {'hm': 1, 'reg': 2, 'wh': 2, 'tracking': 2, 'ltrb_amodal': 4}
 
-head = CenterTrackHead(
-    heads, head_convs, 1, 64, weights=dict(hm=1, reg=1, wh=0.1, tracking=1, ltrb_amodal=0.1),
-    test_cfg=dict(topk=100, local_maximum_kernel=3, max_per_img=100),
-    train_cfg=dict(fp_disturb=0.1, lost_disturb=0.4, hm_disturb=0.05)
-)
+head = CenterTrackHead(heads,
+                       head_convs,
+                       1,
+                       64,
+                       weights=dict(hm=1,
+                                    reg=1,
+                                    wh=0.1,
+                                    tracking=1,
+                                    ltrb_amodal=0.1),
+                       test_cfg=dict(topk=100,
+                                     local_maximum_kernel=3,
+                                     max_per_img=100),
+                       train_cfg=dict(fp_disturb=0.1,
+                                      lost_disturb=0.4,
+                                      hm_disturb=0.05))
 # init origin model
 seg = DLASeg(34, heads, head_convs, opt=opt)
 
@@ -95,16 +102,17 @@ if use_cuda:
 backbone_out = backbone(x, pre_img, pre_hm)
 backbone_out_ori = backbone_ori(x, pre_img, pre_hm)
 
-assert all([(v1 == v2).all() for v1, v2 in zip(backbone_out, backbone_out_ori)]), 'backbone != backbone_ori'
+assert all([(v1 == v2).all() for v1, v2 in zip(backbone_out, backbone_out_ori)
+            ]), 'backbone != backbone_ori'
 # neck forward
-## origin partial seg
+# origin partial seg
 x_ori = seg.dla_up(backbone_out_ori)
 y_ori = []
 for i in range(seg.last_level - seg.first_level):
     y_ori.append(x_ori[i].clone())
 seg.ida_up(y_ori, 0, len(y_ori))
 neck_out_ori = y_ori[-1]
-## ---------------------
+# ---------------------
 neck_out = neck(backbone_out)
 assert (neck_out[-1] == neck_out_ori[-1]).all(), 'neck_out != neck_out_ori'
 
@@ -117,5 +125,6 @@ for head in seg.heads:
 head_output_ori = [head_output_ori]
 head_output_ori[0] = _sigmoid_output(head_output_ori[0])
 for head in seg.heads:
-    assert (head_output[0][head] == head_output_ori[0][head]).all(), f'{head} not match'
+    assert (head_output[0][head] == head_output_ori[0][head]
+            ).all(), f'{head} not match'
 print('done head')

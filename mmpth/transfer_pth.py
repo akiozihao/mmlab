@@ -33,7 +33,8 @@ def transfer_pth(source_pth):
             nk, nv = trans_base(k, v)
         elif type == 'dla_up' or type == 'ida_up':
             nk, nv = trans_neck(k, v)
-        elif type == 'hm' or type == 'reg' or type == 'wh' or type == 'tracking' or type == 'ltrb_amodal':
+        elif type == 'hm' or type == 'reg' or type == 'wh' or \
+                type == 'tracking' or type == 'ltrb_amodal':
             nk, nv = trans_head(k, v)
         # if nk not in ignore:
         nk = 'detector.' + nk
@@ -50,7 +51,8 @@ def transfer_pth(source_pth):
 def trans_base(k, v):
     l_k = k.split('.')
     l_k[0] = 'backbone'
-    if l_k[1] == 'base_layer' or l_k[1] == 'pre_img_layer' or l_k[1] == 'pre_hm_layer':
+    if l_k[1] == 'base_layer' or l_k[1] == 'pre_img_layer' or l_k[
+            1] == 'pre_hm_layer':
         if l_k[2] == '0':
             l_k[2] = 'conv'
         elif l_k[2] == '1':
@@ -85,7 +87,7 @@ def trans_ida(k):
     if l_k[2] == 'actf':
         l_k[2] = 'bn'
         l_k.pop(-2)
-    if  len(l_k) > 3 and l_k[3] == 'conv_offset_mask':
+    if len(l_k) > 3 and l_k[3] == 'conv_offset_mask':
         l_k[3] = 'conv_offset'
     return l_k
 
@@ -115,9 +117,11 @@ def trans_head(k, v):
     l_k.insert(0, 'bbox_head')
     return '.'.join(str(i) for i in l_k), v
 
-new_pth_info = transfer_pth('/home/akio/dev/centertrack_origin/models/mot17_fulltrain.pth')
 
-for k,v in new_pth_info['state_dict'].items():
-    print(k,v.shape)
+new_pth_info = transfer_pth(
+    '/home/akio/dev/centertrack_origin/models/mot17_fulltrain.pth')
+
+for k, v in new_pth_info['state_dict'].items():
+    print(k, v.shape)
 
 torch.save(new_pth_info, '../models/mmlab_mot17_fulltrain.pth')

@@ -5,9 +5,8 @@ import os.path as osp
 from collections import defaultdict
 
 import cv2
-from tqdm import tqdm
-
 import mmcv
+from tqdm import tqdm
 
 
 def parse_args():
@@ -61,13 +60,10 @@ def main():
         for video_name in video_name:
             # basic params
             video = dict(
-                id=vid_id,
-                name=video_name,
-                fps=-1,
-                width=-1,
-                height=-1)
+                id=vid_id, name=video_name, fps=-1, width=-1, height=-1)
             # parse annotations
-            infos = mmcv.list_from_file(f'{args.input}/annotation_{subset}.odgt')
+            infos = mmcv.list_from_file(
+                f'{args.input}/annotation_{subset}.odgt')
             img2gts = parse_gts(infos)
             img_names = img2gts.keys()
             img_names = sorted(img_names)
@@ -86,7 +82,8 @@ def main():
                     mot_frame_id=frame_id)
                 infos = img2gts[img_name]
                 for gt in infos:
-                    gt.update(id=ann_id, image_id=img_id, instance_id=instance_id)
+                    gt.update(
+                        id=ann_id, image_id=img_id, instance_id=instance_id)
                     outputs['annotations'].append(gt)
                     ann_id += 1
                     instance_id += 1

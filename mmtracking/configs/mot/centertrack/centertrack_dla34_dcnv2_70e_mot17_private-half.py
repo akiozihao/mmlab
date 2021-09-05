@@ -1,21 +1,21 @@
 custom_imports = dict(
-    imports=['mmdet.models.backbones.dla',
-             'mmdet.models.necks.dla_neck',
-             'mmdet.models.dense_heads.centertrack_head',
-             'mmdet.models.detectors.ct_detector',
-             'mmdet.datasets.pipelines.transforms',
-             'mmtrack.models.mot.trackers.ct_tracker',
-             'mmtrack.models.mot.center_track',
-             'mmtrack.datasets.pipelines.transforms'],
-    allow_failed_imports=False
-)
-_base_ = [
-    '../../_base_/default_runtime.py'
-]
+    imports=[
+        'mmdet.models.backbones.dla', 'mmdet.models.necks.dla_neck',
+        'mmdet.models.dense_heads.centertrack_head',
+        'mmdet.models.detectors.ct_detector',
+        'mmdet.datasets.pipelines.transforms',
+        'mmtrack.models.mot.trackers.ct_tracker',
+        'mmtrack.models.mot.center_track',
+        'mmtrack.datasets.pipelines.transforms'
+    ],
+    allow_failed_imports=False)
+_base_ = ['../../_base_/default_runtime.py']
 # dataset settings
 dataset_type = 'MOTChallengeDataset'
 img_norm_cfg = dict(
-    mean=[104.01362, 114.034225, 119.916595], std=[73.60277, 69.89082, 70.91508], to_rgb=False)
+    mean=[104.01362, 114.034225, 119.916595],
+    std=[73.60277, 69.89082, 70.91508],
+    to_rgb=False)
 train_pipeline = [
     dict(type='LoadMultiImagesFromFile', to_float32=True),
     dict(type='SeqLoadAnnotations', with_bbox=True, with_track=True),
@@ -39,8 +39,7 @@ train_pipeline = [
         keys=[
             'img', 'gt_bboxes', 'gt_labels', 'gt_match_indices',
             'gt_instance_ids'
-        ]
-    ),
+        ]),
     dict(type='SeqDefaultFormatBundle', ref_prefix='ref')
 ]
 test_pipeline = [
@@ -51,17 +50,14 @@ test_pipeline = [
         # scale_factor=1.0,
         flip=False,
         transforms=[
-            dict(
-                type='RandomCenterAffine',
-                test_mode=True),
+            dict(type='RandomCenterAffine', test_mode=True),
             dict(type='Normalize', **img_norm_cfg),
             dict(type='ImageToTensor', keys=['img']),
             dict(
                 type='VideoCollect',
                 meta_keys=('pad_shape', 'invert_transform_affine'),
                 keys=['img'])
-        ]
-    )
+        ])
 ]
 
 data_root = '../data/mot17-frcnn/'
@@ -82,26 +78,24 @@ data = dict(
                 frame_range=2,
                 filter_key_img=True,
                 method='uniform'),
-            pipeline=train_pipeline)
-    ),
+            pipeline=train_pipeline)),
     val=dict(
         type=dataset_type,
         ann_file=data_root + 'annotations/half-val_cocoformat.json',
         img_prefix=data_root + 'train',
         ref_img_sampler=None,
-        pipeline=test_pipeline
-    ),
+        pipeline=test_pipeline),
     test=dict(
         type=dataset_type,
         ann_file=data_root + 'annotations/half-val_cocoformat.json',
         img_prefix=data_root + 'train',
         ref_img_sampler=None,
-        pipeline=test_pipeline
-    )
-)
+        pipeline=test_pipeline))
 model = dict(
     type='CenterTrack',
-    init_cfg=dict(type='Pretrained', checkpoint='../models/mmlab_crowdhuman.pth'),  # here for mmlab checkpoints
+    init_cfg=dict(
+        type='Pretrained', checkpoint='../models/mmlab_crowdhuman.pth'
+    ),  # here for mmlab checkpoints
     detector=dict(
         type='CTDetector',
         backbone=dict(
@@ -126,18 +120,18 @@ model = dict(
         train_cfg=dict(fp_disturb=0.1, lost_disturb=0.4, hm_disturb=0.05),
         use_origin_gaussian_radius=False,
     ),
-    tracker=dict(type='CTTracker',
-                 obj_score_thr=0.4,
-                 num_frames_retain=3,
-                 momentums=dict(
-                     ids=1,
-                     bboxes_input=1,
-                     bboxes=1,
-                     cts=1,
-                     labels=1,
-                     frame_ids=1,
-                 ))
-)
+    tracker=dict(
+        type='CTTracker',
+        obj_score_thr=0.4,
+        num_frames_retain=3,
+        momentums=dict(
+            ids=1,
+            bboxes_input=1,
+            bboxes=1,
+            cts=1,
+            labels=1,
+            frame_ids=1,
+        )))
 
 # optimizer
 optimizer = dict(_delete_=True, type='Adam', lr=1.25e-4 / 2)
@@ -150,8 +144,7 @@ lr_config = dict(
     # warmup='linear',
     # warmup_iters=1000,
     # warmup_ratio=1.0 / 1000,
-    step=[60]
-)
+    step=[60])
 
 # runtime settings
 total_epochs = 70

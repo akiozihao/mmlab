@@ -1,14 +1,13 @@
 import torch
+from mmcv.cnn import ConvModule, build_conv_layer, build_norm_layer
+from mmcv.runner import BaseModule
 from torch import nn
 
-from mmcv.cnn import ConvModule
-from mmcv.cnn import build_conv_layer, build_norm_layer
-from mmcv.runner import BaseModule
 from mmdet.models.builder import BACKBONES
 
 
 class DLABasicBlock(BaseModule):
-    """BasicBlock for Deep Layer Aggregation
+    """BasicBlock for Deep Layer Aggregation.
 
     Args:
         inplanes (int): Number of input channels.
@@ -22,15 +21,16 @@ class DLABasicBlock(BaseModule):
             Default: None
     """
 
-    def __init__(self,
-                 inplanes,
-                 planes,
-                 stride=1,
-                 dilation=1,
-                 conv_cfg=None,
-                 norm_cfg=None,
-                 init_cfg=None,
-                 ):
+    def __init__(
+        self,
+        inplanes,
+        planes,
+        stride=1,
+        dilation=1,
+        conv_cfg=None,
+        norm_cfg=None,
+        init_cfg=None,
+    ):
         super(DLABasicBlock, self).__init__(init_cfg)
 
         self.norm1_name, norm1 = build_norm_layer(norm_cfg, planes, postfix=1)
@@ -54,8 +54,7 @@ class DLABasicBlock(BaseModule):
             stride=1,
             padding=dilation,
             dilation=dilation,
-            bias=False
-        )
+            bias=False)
         self.add_module(self.norm2_name, norm2)
 
     @property
@@ -86,7 +85,7 @@ class DLABasicBlock(BaseModule):
 
 
 class Root(BaseModule):
-    """Root layer of the tree structure in Deep Layer Aggregation
+    """Root layer of the tree structure in Deep Layer Aggregation.
 
     Args:
         inplanes (int): Number of input channels.
@@ -118,8 +117,7 @@ class Root(BaseModule):
             kernel_size=kernel_size,
             stride=1,
             bias=False,
-            padding=(kernel_size - 1) // 2
-        )
+            padding=(kernel_size - 1) // 2)
         self.add_module(self.norm1_name, norm1)
         self.residual = residual
         self.relu = nn.ReLU(inplace=True)
@@ -141,7 +139,7 @@ class Root(BaseModule):
 
 
 class Tree(BaseModule):
-    """Tree layer of the tree structure in Deep Layer Aggregation
+    """Tree layer of the tree structure in Deep Layer Aggregation.
 
     Args:
         levels (int): The level of current tree.
@@ -151,7 +149,8 @@ class Tree(BaseModule):
         stride (int | tuple[int]): Stride of the convolution. Default 1.
         level_root (bool): Whether to use level_root. Default False.
         root_dim (int): Root dimension. Default 0.
-        root_kernel_size (int | tuple[int]):  Size of the root convolution kernel. Default 1.
+        root_kernel_size (int | tuple[int]):  Size of the root convolution
+            kernel. Default 1.
         dilation (int | tuple[int]: Spacing between kernel elements.
         root_residual (bool): Whether to use residual. Default False.
         conv_cfg (dict): Config dict for convolution layers. Default: None,
@@ -174,8 +173,7 @@ class Tree(BaseModule):
                  root_residual=False,
                  conv_cfg=None,
                  norm_cfg=None,
-                 init_cfg=None
-                 ):
+                 init_cfg=None):
 
         super(Tree, self).__init__(init_cfg)
         self.norm_cfg = norm_cfg
@@ -184,56 +182,57 @@ class Tree(BaseModule):
         if level_root:
             root_dim += inplanes
         if levels == 1:
-            self.tree1 = block(inplanes,
-                               planes,
-                               stride,
-                               dilation=dilation,
-                               conv_cfg=conv_cfg,
-                               norm_cfg=norm_cfg,
-                               init_cfg=init_cfg)
-            self.tree2 = block(planes,
-                               planes,
-                               1,
-                               dilation=dilation,
-                               conv_cfg=conv_cfg,
-                               norm_cfg=norm_cfg,
-                               init_cfg=init_cfg
-                               )
+            self.tree1 = block(
+                inplanes,
+                planes,
+                stride,
+                dilation=dilation,
+                conv_cfg=conv_cfg,
+                norm_cfg=norm_cfg,
+                init_cfg=init_cfg)
+            self.tree2 = block(
+                planes,
+                planes,
+                1,
+                dilation=dilation,
+                conv_cfg=conv_cfg,
+                norm_cfg=norm_cfg,
+                init_cfg=init_cfg)
         else:
-            self.tree1 = Tree(levels - 1,
-                              block,
-                              inplanes,
-                              planes,
-                              stride,
-                              root_dim=0,
-                              root_kernel_size=root_kernel_size,
-                              dilation=dilation,
-                              root_residual=root_residual,
-                              conv_cfg=conv_cfg,
-                              norm_cfg=norm_cfg,
-                              init_cfg=init_cfg
-                              )
-            self.tree2 = Tree(levels - 1,
-                              block,
-                              planes,
-                              planes,
-                              root_dim=root_dim + planes,
-                              root_kernel_size=root_kernel_size,
-                              dilation=dilation,
-                              root_residual=root_residual,
-                              conv_cfg=conv_cfg,
-                              norm_cfg=norm_cfg,
-                              init_cfg=init_cfg
-                              )
+            self.tree1 = Tree(
+                levels - 1,
+                block,
+                inplanes,
+                planes,
+                stride,
+                root_dim=0,
+                root_kernel_size=root_kernel_size,
+                dilation=dilation,
+                root_residual=root_residual,
+                conv_cfg=conv_cfg,
+                norm_cfg=norm_cfg,
+                init_cfg=init_cfg)
+            self.tree2 = Tree(
+                levels - 1,
+                block,
+                planes,
+                planes,
+                root_dim=root_dim + planes,
+                root_kernel_size=root_kernel_size,
+                dilation=dilation,
+                root_residual=root_residual,
+                conv_cfg=conv_cfg,
+                norm_cfg=norm_cfg,
+                init_cfg=init_cfg)
         if levels == 1:
-            self.root = Root(root_dim,
-                             planes,
-                             root_kernel_size,
-                             root_residual,
-                             conv_cfg=conv_cfg,
-                             norm_cfg=norm_cfg,
-                             init_cfg=init_cfg
-                             )
+            self.root = Root(
+                root_dim,
+                planes,
+                root_kernel_size,
+                root_residual,
+                conv_cfg=conv_cfg,
+                norm_cfg=norm_cfg,
+                init_cfg=init_cfg)
 
         self.level_root = level_root
         self.root_dim = root_dim
@@ -243,17 +242,10 @@ class Tree(BaseModule):
         if stride > 1:
             self.downsample = nn.MaxPool2d(stride, stride=stride)
         if inplanes != planes:
-            conv = build_conv_layer(conv_cfg,
-                                    inplanes,
-                                    planes,
-                                    1,
-                                    stride=1,
-                                    bias=False)
+            conv = build_conv_layer(
+                conv_cfg, inplanes, planes, 1, stride=1, bias=False)
             norm_name, norm = build_norm_layer(norm_cfg, planes)
-            self.project = nn.Sequential(
-                conv,
-                norm
-            )
+            self.project = nn.Sequential(conv, norm)
 
     def forward(self, x, residual=None, children=None):
         children = [] if children is None else children
@@ -273,7 +265,7 @@ class Tree(BaseModule):
 
 @BACKBONES.register_module()
 class DLA(BaseModule):
-    """Deep Layer Aggregation
+    """Deep Layer Aggregation.
 
     Args:
         levels (list[int]): Number of convolution layers at each level.
@@ -298,8 +290,7 @@ class DLA(BaseModule):
                  use_pre_hm=True,
                  conv_cfg=None,
                  norm_cfg=None,
-                 init_cfg=None
-                 ):
+                 init_cfg=None):
 
         super(DLA, self).__init__(init_cfg)
         self.conv_cfg = conv_cfg
@@ -315,42 +306,54 @@ class DLA(BaseModule):
             conv_cfg=conv_cfg,
             norm_cfg=norm_cfg,
         )
-        self.level0 = self._make_conv_level(
-            channels[0], channels[0], levels[0])
+        self.level0 = self._make_conv_level(channels[0], channels[0],
+                                            levels[0])
         self.level1 = self._make_conv_level(
             channels[0], channels[1], levels[1], stride=2)
         self.level2 = Tree(
-            levels[2], block, channels[1], channels[2], 2,
+            levels[2],
+            block,
+            channels[1],
+            channels[2],
+            2,
             level_root=False,
             root_residual=root_residual,
             conv_cfg=conv_cfg,
             norm_cfg=norm_cfg,
-            init_cfg=init_cfg
-        )
+            init_cfg=init_cfg)
         self.level3 = Tree(
-            levels[3], block, channels[2], channels[3], 2,
+            levels[3],
+            block,
+            channels[2],
+            channels[3],
+            2,
             level_root=True,
             root_residual=root_residual,
             conv_cfg=conv_cfg,
             norm_cfg=norm_cfg,
-            init_cfg=init_cfg
-        )
+            init_cfg=init_cfg)
         self.level4 = Tree(
-            levels[4], block, channels[3], channels[4], 2,
+            levels[4],
+            block,
+            channels[3],
+            channels[4],
+            2,
             level_root=True,
             root_residual=root_residual,
             conv_cfg=conv_cfg,
             norm_cfg=norm_cfg,
-            init_cfg=init_cfg
-        )
+            init_cfg=init_cfg)
         self.level5 = Tree(
-            levels[5], block, channels[4], channels[5], 2,
+            levels[5],
+            block,
+            channels[4],
+            channels[5],
+            2,
             level_root=True,
             root_residual=root_residual,
             conv_cfg=conv_cfg,
             norm_cfg=norm_cfg,
-            init_cfg=init_cfg
-        )
+            init_cfg=init_cfg)
         if use_pre_img:
             self.pre_img_layer = ConvModule(
                 3,
@@ -387,9 +390,7 @@ class DLA(BaseModule):
                     bias=False,
                     dilation=dilation,
                     conv_cfg=self.conv_cfg,
-                    norm_cfg=self.norm_cfg
-                )
-            )
+                    norm_cfg=self.norm_cfg))
         return nn.Sequential(*modules)
 
     def forward(self, x, pre_img=None, pre_hm=None):

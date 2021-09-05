@@ -1,12 +1,12 @@
 import copy
 
 import cv2
-import numpy as np
-
 import mmcv
+import numpy as np
 from mmdet.datasets.builder import PIPELINES
 from mmdet.datasets.pipelines import Normalize, Pad, RandomFlip, Resize
 from mmdet.datasets.pipelines.transforms import RandomCenterAffine
+
 from mmtrack.core import crop_image
 
 
@@ -590,7 +590,7 @@ class SeqRandomCrop(object):
                 bboxes[:, 0::2] = np.clip(bboxes[:, 0::2], 0, img_shape[1])
                 bboxes[:, 1::2] = np.clip(bboxes[:, 1::2], 0, img_shape[0])
             valid_inds = (bboxes[:, 2] > bboxes[:, 0]) & (
-                    bboxes[:, 3] > bboxes[:, 1])
+                bboxes[:, 3] > bboxes[:, 1])
             # If the crop does not contain any gt-bbox area and
             # self.allow_negative_crop is False, skip this image.
             if (key == 'gt_bboxes' and not valid_inds.any()
@@ -608,7 +608,7 @@ class SeqRandomCrop(object):
             if mask_key in results:
                 results[mask_key] = results[mask_key][
                     valid_inds.nonzero()[0]].crop(
-                    np.asarray([crop_x1, crop_y1, crop_x2, crop_y2]))
+                        np.asarray([crop_x1, crop_y1, crop_x2, crop_y2]))
 
         # crop semantic seg
         for key in results.get('seg_fields', []):
@@ -730,7 +730,8 @@ class SeqPhotoMetricDistortion(object):
                 'Only single img_fields is allowed'
         img = results['img']
         assert img.dtype == np.float32, \
-            'PhotoMetricDistortion needs the input image of dtype np.float32,' \
+            'PhotoMetricDistortion needs the ' \
+            'input image of dtype np.float32,' \
             ' please set "to_float32=True" in "LoadImageFromFile" pipeline'
         # random brightness
         if params['delta'] is not None:
@@ -813,12 +814,8 @@ class SeqRandomCenterAffine(RandomCenterAffine):
                  shift=None,
                  test_mode=False,
                  share_params=True):
-        super(SeqRandomCenterAffine, self).__init__(crop_size,
-                                                    ratios,
-                                                    border,
-                                                    scale,
-                                                    shift,
-                                                    test_mode)
+        super(SeqRandomCenterAffine, self).__init__(crop_size, ratios, border,
+                                                    scale, shift, test_mode)
         self.share_params = share_params
 
     def _train_aug(self, results):
@@ -849,12 +846,17 @@ class SeqRandomCenterAffine(RandomCenterAffine):
                         s = img_size.max()
                         sf = self.scale
                         cf = self.shift
-                        ct[0] += s * np.clip(np.random.randn() * cf, -2 * cf, 2 * cf)
-                        ct[1] += s * np.clip(np.random.randn() * cf, -2 * cf, 2 * cf)
-                        aug_scale = np.clip(np.random.randn() * sf + 1, 1 - sf, 1 + sf)
+                        ct[0] += s * np.clip(np.random.randn() * cf, -2 * cf,
+                                             2 * cf)
+                        ct[1] += s * np.clip(np.random.randn() * cf, -2 * cf,
+                                             2 * cf)
+                        aug_scale = np.clip(np.random.randn() * sf + 1, 1 - sf,
+                                            1 + sf)
                     else:
-                        ct[0] = np.random.randint(low=w_border, high=w - w_border)
-                        ct[1] = np.random.randint(low=h_border, high=h - h_border)
+                        ct[0] = np.random.randint(
+                            low=w_border, high=w - w_border)
+                        ct[1] = np.random.randint(
+                            low=h_border, high=h - h_border)
                         aug_scale = np.random.choice(self.ratios)
 
                     size_t = img_size * aug_scale
@@ -868,8 +870,10 @@ class SeqRandomCenterAffine(RandomCenterAffine):
                     for idx, bboxes_t in enumerate(all_bboxes_t):
                         any_bbox = False
                         for i, bbox_t in enumerate(bboxes_t):
-                            bbox_t[:2] = self._affine_transform(bbox_t[:2], trans_input)
-                            bbox_t[2:] = self._affine_transform(bbox_t[2:], trans_input)
+                            bbox_t[:2] = self._affine_transform(
+                                bbox_t[:2], trans_input)
+                            bbox_t[2:] = self._affine_transform(
+                                bbox_t[2:], trans_input)
 
                             x1, x2 = np.clip(bbox_t[[0, 2]], 0, new_w - 1)
                             y1, y2 = np.clip(bbox_t[[1, 3]], 0, new_h - 1)

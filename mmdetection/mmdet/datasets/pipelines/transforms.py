@@ -533,7 +533,7 @@ class RandomShift:
                 bbox_w = bboxes[..., 2] - bboxes[..., 0]
                 bbox_h = bboxes[..., 3] - bboxes[..., 1]
                 valid_inds = (bbox_w > self.filter_thr_px) & (
-                        bbox_h > self.filter_thr_px)
+                    bbox_h > self.filter_thr_px)
                 # If the shift does not contain any gt-bbox area, skip this
                 # image.
                 if key == 'gt_bboxes' and not valid_inds.any():
@@ -734,7 +734,7 @@ class RandomCrop:
                  allow_negative_crop=False,
                  bbox_clip_border=True):
         if crop_type not in [
-            'relative_range', 'relative', 'absolute', 'absolute_range'
+                'relative_range', 'relative', 'absolute', 'absolute_range'
         ]:
             raise ValueError(f'Invalid crop_type {crop_type}.')
         if crop_type in ['absolute', 'absolute_range']:
@@ -797,7 +797,7 @@ class RandomCrop:
                 bboxes[:, 0::2] = np.clip(bboxes[:, 0::2], 0, img_shape[1])
                 bboxes[:, 1::2] = np.clip(bboxes[:, 1::2], 0, img_shape[0])
             valid_inds = (bboxes[:, 2] > bboxes[:, 0]) & (
-                    bboxes[:, 3] > bboxes[:, 1])
+                bboxes[:, 3] > bboxes[:, 1])
             # If the crop does not contain any gt-bbox area and
             # allow_negative_crop is False, skip this image.
             if (key == 'gt_bboxes' and not valid_inds.any()
@@ -814,7 +814,7 @@ class RandomCrop:
             if mask_key in results:
                 results[mask_key] = results[mask_key][
                     valid_inds.nonzero()[0]].crop(
-                    np.asarray([crop_x1, crop_y1, crop_x2, crop_y2]))
+                        np.asarray([crop_x1, crop_y1, crop_x2, crop_y2]))
 
         # crop semantic seg
         for key in results.get('seg_fields', []):
@@ -1243,7 +1243,7 @@ class MinIoURandomCrop:
                 # seg fields
                 for key in results.get('seg_fields', []):
                     results[key] = results[key][patch[1]:patch[3],
-                                   patch[0]:patch[2]]
+                                                patch[0]:patch[2]]
                 return results
 
     def __repr__(self):
@@ -1719,7 +1719,7 @@ class RandomCenterCropPad:
             cropped_center_y - top, cropped_center_y + bottom,
             cropped_center_x - left, cropped_center_x + right
         ],
-            dtype=np.float32)
+                          dtype=np.float32)
 
         return cropped_img, border, patch
 
@@ -1773,7 +1773,7 @@ class RandomCenterCropPad:
                         bboxes[:, 0:4:2] = np.clip(bboxes[:, 0:4:2], 0, new_w)
                         bboxes[:, 1:4:2] = np.clip(bboxes[:, 1:4:2], 0, new_h)
                     keep = (bboxes[:, 2] > bboxes[:, 0]) & (
-                            bboxes[:, 3] > bboxes[:, 1])
+                        bboxes[:, 3] > bboxes[:, 1])
                     bboxes = bboxes[keep]
                     results[key] = bboxes
                     if key in ['gt_bboxes']:
@@ -2594,14 +2594,16 @@ class RandomAffine:
 
 @PIPELINES.register_module()
 class RandomCenterAffine(object):
-    def __init__(self,
-                 crop_size=(544, 960),
-                 ratios=None,
-                 border=128,
-                 scale=None,
-                 shift=None,
-                 test_mode=False,
-                 ):
+
+    def __init__(
+        self,
+        crop_size=(544, 960),
+        ratios=None,
+        border=128,
+        scale=None,
+        shift=None,
+        test_mode=False,
+    ):
         self.crop_size = crop_size
         self.ratios = ratios
         self.scale = scale
@@ -2636,13 +2638,18 @@ class RandomCenterAffine(object):
                         s = img_size.max()
                         sf = self.scale
                         cf = self.shift
-                        ct[0] += s * np.clip(np.random.randn() * cf, -2 * cf, 2 * cf)
-                        ct[1] += s * np.clip(np.random.randn() * cf, -2 * cf, 2 * cf)
-                        aug_scale = np.clip(np.random.randn() * sf + 1, 1 - sf, 1 + sf)
+                        ct[0] += s * np.clip(np.random.randn() * cf, -2 * cf,
+                                             2 * cf)
+                        ct[1] += s * np.clip(np.random.randn() * cf, -2 * cf,
+                                             2 * cf)
+                        aug_scale = np.clip(np.random.randn() * sf + 1, 1 - sf,
+                                            1 + sf)
                     else:
                         assert isinstance(self.ratios, tuple)
-                        ct[0] = np.random.randint(low=w_border, high=w - w_border)
-                        ct[1] = np.random.randint(low=h_border, high=h - h_border)
+                        ct[0] = np.random.randint(
+                            low=w_border, high=w - w_border)
+                        ct[1] = np.random.randint(
+                            low=h_border, high=h - h_border)
                         aug_scale = random.choice(self.ratios)
 
                     size_t = img_size * aug_scale
@@ -2651,13 +2658,16 @@ class RandomCenterAffine(object):
                     bboxes_test = bboxes.copy()
                     any_bbox = False
                     for i, bbox_t in enumerate(bboxes_test):
-                        bbox_t[:2] = self._affine_transform(bbox_t[:2], trans_input)
-                        bbox_t[2:] = self._affine_transform(bbox_t[2:], trans_input)
+                        bbox_t[:2] = self._affine_transform(
+                            bbox_t[:2], trans_input)
+                        bbox_t[2:] = self._affine_transform(
+                            bbox_t[2:], trans_input)
 
                         bbox_t[[0, 2]] = np.clip(bbox_t[[0, 2]], 0, new_w - 1)
                         bbox_t[[1, 3]] = np.clip(bbox_t[[1, 3]], 0, new_h - 1)
 
-                        bbox_h, bbox_w = bbox_t[3] - bbox_t[1], bbox_t[2] - bbox_t[0]
+                        bbox_h, bbox_w = bbox_t[3] - bbox_t[1], bbox_t[
+                            2] - bbox_t[0]
                         if bbox_h <= 0 or bbox_w <= 0:
                             continue
                         any_bbox = True
@@ -2667,13 +2677,16 @@ class RandomCenterAffine(object):
                         break
                 if center is not None:
                     break
-        trans_input = self._get_affine_transform(
-            center, size_t, [new_w, new_h])
+        trans_input = self._get_affine_transform(center, size_t,
+                                                 [new_w, new_h])
         trans_input_inv = self._get_affine_transform(
             center, size_t, [new_w, new_h], inv=1)
-        cropped_img = cv2.warpAffine(img, trans_input, (new_w, new_h), flags=cv2.INTER_LINEAR)
-        bboxes[:, :2] = self._affine_transform_bboxes(bboxes[:, :2], trans_input)
-        bboxes[:, 2:] = self._affine_transform_bboxes(bboxes[:, 2:], trans_input)
+        cropped_img = cv2.warpAffine(
+            img, trans_input, (new_w, new_h), flags=cv2.INTER_LINEAR)
+        bboxes[:, :2] = self._affine_transform_bboxes(bboxes[:, :2],
+                                                      trans_input)
+        bboxes[:, 2:] = self._affine_transform_bboxes(bboxes[:, 2:],
+                                                      trans_input)
         results['img'] = cropped_img
         results['img_shape'] = cropped_img.shape
         results['pad_shape'] = cropped_img.shape
@@ -2690,9 +2703,9 @@ class RandomCenterAffine(object):
         new_h = int(self.crop_size[0])
         new_w = int(self.crop_size[1])
 
-        trans_input = self._get_affine_transform(
-            ct, img_size, [new_w, new_h])
-        cropped_img = cv2.warpAffine(img, trans_input, (new_w, new_h), flags=cv2.INTER_LINEAR)
+        trans_input = self._get_affine_transform(ct, img_size, [new_w, new_h])
+        cropped_img = cv2.warpAffine(
+            img, trans_input, (new_w, new_h), flags=cv2.INTER_LINEAR)
 
         results['img'] = cropped_img
         results['transform_affine'] = trans_input
@@ -2706,15 +2719,17 @@ class RandomCenterAffine(object):
         return new_pt[:2]
 
     def _affine_transform_bboxes(self, bboxes, t):
-        new_bboxes = np.concatenate((bboxes, np.ones((bboxes.shape[0], 1))), axis=1)
+        new_bboxes = np.concatenate((bboxes, np.ones((bboxes.shape[0], 1))),
+                                    axis=1)
         new_bboxes = np.matmul(new_bboxes, t.T)
         return new_bboxes
 
-    def _get_affine_transform(self,
-                              center,
-                              scale,  # todo change to width
-                              output_size,
-                              inv=0):
+    def _get_affine_transform(
+            self,
+            center,
+            scale,  # todo change to width
+            output_size,
+            inv=0):
         # if not isinstance(scale, np.ndarray) and not isinstance(scale, list):
         #     scale = np.array([scale, scale], dtype=np.float32)
         if not isinstance(output_size, np.ndarray):
@@ -2722,7 +2737,6 @@ class RandomCenterAffine(object):
 
         src_w = scale[0]
         dst_w = output_size[0]
-        dst_h = output_size[1]
         dst_center = output_size * 0.5
 
         src_dir = np.array([0, src_w * -0.5], np.float32)
@@ -2750,8 +2764,9 @@ class RandomCenterAffine(object):
         return trans
 
     def _get_border(self, border, size):
-        """Get final border for the target size.
-        This function generates a ``final_border`` according to image's shape.
+        """Get final border for the target size. This function generates a
+        ``final_border`` according to image's shape.
+
         The area between ``final_border`` and ``size - final_border`` is the
         ``center range``. We randomly choose center from the ``center range``
         to avoid our random center is too close to original image's border.

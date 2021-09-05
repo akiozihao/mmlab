@@ -7,22 +7,13 @@ from .base_tracker import BaseTracker
 
 @TRACKERS.register_module()
 class CTTracker(BaseTracker):
-    def __init__(self,
-                 obj_score_thr=0.4,
-                 momentums=None,
-                 num_frames_retain=3):
+
+    def __init__(self, obj_score_thr=0.4, momentums=None, num_frames_retain=3):
         super(CTTracker, self).__init__(momentums, num_frames_retain)
         self.obj_score_thr = obj_score_thr
 
-    def track(self,
-              bboxes_input,
-              bboxes,
-              det_centers,
-              det_tracking_offset,
-              labels,
-              frame_id,
-              public_bboxes,
-              public_labels):
+    def track(self, bboxes_input, bboxes, det_centers, det_tracking_offset,
+              labels, frame_id, public_bboxes, public_labels):
         # public_bboxes = torch.load('/home/akio/Desktop/tp.pth')
         valid_inds = bboxes[:, -1] > self.obj_score_thr
         bboxes_input = bboxes_input[valid_inds]
@@ -31,8 +22,9 @@ class CTTracker(BaseTracker):
         det_tracking_offset = det_tracking_offset[valid_inds]
         det_centers_with_motion = det_centers + det_tracking_offset
         labels = labels[valid_inds]
-        item_size = (bboxes[:, 3] - bboxes[:, 1]) * (bboxes[:, 2] - bboxes[:, 0])  # N
-        ids = torch.full((bboxes.size(0),), -1, dtype=torch.long)
+        item_size = (bboxes[:, 3] - bboxes[:, 1]) * (
+            bboxes[:, 2] - bboxes[:, 0])  # N
+        ids = torch.full((bboxes.size(0), ), -1, dtype=torch.long)
         pre_bboxes = self.pre_bboxes
         N = bboxes.shape[0]
         if self.empty or bboxes.size(0) == 0 or pre_bboxes is None:
@@ -46,11 +38,13 @@ class CTTracker(BaseTracker):
             M = pre_bboxes.shape[0]
             track_size = (pre_bboxes[:, 3] - pre_bboxes[:, 1]) * \
                          (pre_bboxes[:, 2] - pre_bboxes[:, 0])  # M
-            dist = torch.pow(torch.cdist(det_centers_with_motion, self.pre_cts, 2),2)
+            dist = torch.pow(
+                torch.cdist(det_centers_with_motion, self.pre_cts, 2), 2)
             # invalid
-            invalid = ((dist > track_size.reshape(1, M)) + \
-                       (dist > item_size.reshape(N, 1)) + \
-                       (labels.reshape(N, 1) != self.pre_labels.reshape(1, M))) > 0
+            invalid = (
+                (dist > track_size.reshape(1, M)) +
+                (dist > item_size.reshape(N, 1)) +
+                (labels.reshape(N, 1) != self.pre_labels.reshape(1, M))) > 0
             dist = dist + invalid * 1e18
             matched_indices = self._greedy_assignment(dist)
             # pre_ids = self.pre_ids
@@ -58,7 +52,9 @@ class CTTracker(BaseTracker):
 
             # public detection
             if public_bboxes is not None:
-                p_dist = torch.cdist(self._xyxy2center(public_bboxes), det_centers_with_motion,2)
+                p_dist = torch.cdist(
+                    self._xyxy2center(public_bboxes), det_centers_with_motion,
+                    2)
                 # Filter out bbox matched with previous frame
                 p_dist[:, matched_indices[:, 0]] += 1e18
                 # p_invalid = p_dist > item_size.reshape(1, N)

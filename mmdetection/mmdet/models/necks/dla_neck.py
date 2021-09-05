@@ -2,15 +2,14 @@ import math
 
 import numpy as np
 import torch.nn as nn
-
-from mmcv.cnn import ConvModule
-from mmcv.cnn import build_conv_layer
+from mmcv.cnn import ConvModule, build_conv_layer
 from mmcv.runner import BaseModule
+
 from mmdet.models.builder import NECKS
 
 
 class IDAUp(BaseModule):
-    """Iterative Deep Aggregation Layer
+    """Iterative Deep Aggregation Layer.
 
     Args:
         planes (int): Number of output channels.
@@ -31,8 +30,7 @@ class IDAUp(BaseModule):
                  use_dcn=True,
                  conv_cfg=None,
                  norm_cfg=None,
-                 init_cfg=None
-                 ):
+                 init_cfg=None):
 
         super(IDAUp, self).__init__(init_cfg)
         self.use_dcn = use_dcn
@@ -46,8 +44,7 @@ class IDAUp(BaseModule):
                 padding=1,
                 conv_cfg=dict(type='DCNv2') if use_dcn else conv_cfg,
                 norm_cfg=norm_cfg,
-                bias=False
-            )
+                bias=False)
             node = ConvModule(
                 planes,
                 planes,
@@ -55,8 +52,7 @@ class IDAUp(BaseModule):
                 padding=1,
                 conv_cfg=dict(type='DCNv2') if use_dcn else conv_cfg,
                 norm_cfg=norm_cfg,
-                bias=False
-            )
+                bias=False)
 
             up = build_conv_layer(
                 dict(type='deconv'),
@@ -110,10 +106,11 @@ class IDAUp(BaseModule):
 
 
 class DLAUp(BaseModule):
-    """Upsampling Layer to merge results of DLA backbone
+    """Upsampling Layer to merge results of DLA backbone.
 
     Args:
-        startp (int): Layer number to start, which controls how many IDA layers participant in forward.
+        startp (int): Layer number to start, which
+            controls how many IDA layers participant in forward.
         channels (list[int]): Number of channels.
         scales (list[int]): Upsample factors.
         in_channels (int): Number of input channels. Default None.
@@ -144,13 +141,15 @@ class DLAUp(BaseModule):
         scales = np.array(scales, dtype=int)
         for i in range(len(channels) - 1):
             j = -i - 2
-            setattr(self, 'ida_{}'.format(i),
-                    IDAUp(channels[j],
-                          in_channels[j:],
-                          scales[j:] // scales[j],
-                          use_dcn=use_dcn,
-                          conv_cfg=conv_cfg,
-                          norm_cfg=norm_cfg))
+            setattr(
+                self, 'ida_{}'.format(i),
+                IDAUp(
+                    channels[j],
+                    in_channels[j:],
+                    scales[j:] // scales[j],
+                    use_dcn=use_dcn,
+                    conv_cfg=conv_cfg,
+                    norm_cfg=norm_cfg))
             scales[j + 1:] = scales[j]
             in_channels[j + 1:] = [channels[j] for _ in channels[j + 1:]]
 
@@ -165,7 +164,7 @@ class DLAUp(BaseModule):
 
 @NECKS.register_module()
 class DLANeck(BaseModule):
-    """Deep Layer Aggregation Neck
+    """Deep Layer Aggregation Neck.
 
     Args:
         channels (list[int]): Number of input channels.
@@ -188,24 +187,23 @@ class DLANeck(BaseModule):
         super(DLANeck, self).__init__(init_cfg)
         self.first_level = int(np.log2(down_ratio))
         self.last_level = 5
-        scales = [2 ** i for i in range(len(channels[self.first_level:]))]
+        scales = [2**i for i in range(len(channels[self.first_level:]))]
         self.dla_up = DLAUp(
             self.first_level,
             channels[self.first_level:],
             scales,
             use_dcn=use_dcn,
             conv_cfg=conv_cfg,
-            norm_cfg=norm_cfg
-        )
+            norm_cfg=norm_cfg)
         out_channel = channels[self.first_level]
 
         self.ida_up = IDAUp(
-            out_channel, channels[self.first_level:self.last_level],
-            [2 ** i for i in range(self.last_level - self.first_level)],
+            out_channel,
+            channels[self.first_level:self.last_level],
+            [2**i for i in range(self.last_level - self.first_level)],
             use_dcn=use_dcn,
             conv_cfg=conv_cfg,
-            norm_cfg=norm_cfg
-        )
+            norm_cfg=norm_cfg)
 
     def forward(self, x):
         x = self.dla_up(x)
