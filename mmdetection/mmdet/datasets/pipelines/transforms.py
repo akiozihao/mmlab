@@ -2608,6 +2608,13 @@ class RandomCenterAffine(object):
         self.shift = shift
         self.border = border
         self.test_mode = test_mode
+        if test_mode:
+            assert ratios is None and shift is None and scale is None
+        else:
+            if ratios is not None:
+                assert shift is None and scale is None
+            else:
+                assert shift is not None and scale is not None
 
     def _train_aug(self, results, ratio=None, center=None):
         img = results['img']
@@ -2640,7 +2647,7 @@ class RandomCenterAffine(object):
 
                     size_t = img_size * aug_scale
                     trans_input = self._get_affine_transform(
-                        center, size_t, [new_w, new_h])
+                        ct, size_t, [new_w, new_h])
                     bboxes_test = bboxes.copy()
                     any_bbox = False
                     for i, bbox_t in enumerate(bboxes_test):
