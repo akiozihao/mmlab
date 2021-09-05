@@ -62,13 +62,14 @@ class CenterTrackHead(CenterNetHead):
         self.loss_ltrb_amodal = build_loss(loss_ltrb_amodal)
 
     def _affine_transform(self, pts, t):
-        """Affine transform
+        """Apply affine transform to points
 
         Args:
-            pts (Tensor): points, shape (num_points, 2)
-            t: (np.array): map_matrix, shape (2,3)
+            pts (torch.Tensor): points, shape (num_points, 2)
+            t (numpy.ndarray): map_matrix, shape (2,3)
 
-        Returns: transformed points, shape (num_points, 2)
+        Returns:
+            transformed points, shape (num_points, 2)
         """
         new_pts = torch.cat((pts, pts.new_ones(pts.shape[0], 1)), axis=1)
         new_pts = torch.matmul(new_pts, torch.tensor(t, dtype=pts.dtype, device=pts.device).T)
@@ -82,16 +83,18 @@ class CenterTrackHead(CenterNetHead):
         """Forward features.
 
         Args:
-            feat (Tensor): Feature from the upstream network, is a 4D-tensor. Notice
-                where is a little difference from CenterNeck. We return a Tensor in
-                neck but CenterNeck return a tuple.
+            feat (torch.Tensor): Feature from the upstream network.
+                Note the feature definition is different from CenterNet's.
+                Our network returns a 4D-Tensor in neck while CenterNet returns a tuple.
 
-        Returns: (dict) : center_heatmap_pred (Tensor), center predict heatmaps,
-                            channels number is num_classes.
-                          wh_pred (Tensor), wh predicts, the channels number is 2.
-                          offset_pred (Tensor): offset predicts, the channels number is 2.
-                          ltrb_amodal_pred (Tensor): ltrb amodal predicts, the channels number is 4.
-                          tracking_pred (Tensor): tracking predicts, the channels number is 2.
+        Returns:
+            (dict[str, torch.Tensor]):
+                center_heatmap_pred (Tensor), center predict heatmaps,
+                channels number is num_classes.
+                wh_pred (Tensor), wh predicts, the channels number is 2.
+                offset_pred (Tensor): offset predicts, the channels number is 2.
+                ltrb_amodal_pred (Tensor): ltrb amodal predicts, the channels number is 4.
+                tracking_pred (Tensor): tracking predicts, the channels number is 2.
         """
         center_heatmap_pred = self._smooth_sigmoid(self.heatmap_head(feat))
         wh_pred = self.wh_head(feat)
