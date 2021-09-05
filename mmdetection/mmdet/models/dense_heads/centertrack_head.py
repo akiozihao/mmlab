@@ -9,7 +9,7 @@ from mmdet.models.utils.gaussian_target import get_local_maximum, get_topk_from_
 
 @HEADS.register_module()
 class CenterTrackHead(CenterNetHead):
-    """
+    """Tracking Objects as Points Head. Paper link <https://arxiv.org/abs/2004.01177>
 
     Args:
         in_channel (int): Number of channel in the input feature map.
@@ -62,6 +62,14 @@ class CenterTrackHead(CenterNetHead):
         self.loss_ltrb_amodal = build_loss(loss_ltrb_amodal)
 
     def _affine_transform(self, pts, t):
+        """Affine transform
+
+        Args:
+            pts (Tensor): points, shape (num_points, 2)
+            t: (np.array): map_matrix, shape (2,3)
+
+        Returns: transformed points, shape (num_points, 2)
+        """
         new_pts = torch.cat((pts, pts.new_ones(pts.shape[0], 1)), axis=1)
         new_pts = torch.matmul(new_pts, torch.tensor(t, dtype=pts.dtype, device=pts.device).T)
         return new_pts
@@ -71,6 +79,20 @@ class CenterTrackHead(CenterNetHead):
         return y
 
     def forward(self, feat):
+        """Forward features.
+
+        Args:
+            feat (Tensor): Feature from the upstream network, is a 4D-tensor. Notice
+                where is a little difference from CenterNeck. We return a Tensor in
+                neck but CenterNeck return a tuple.
+
+        Returns: (dict) : center_heatmap_pred (Tensor), center predict heatmaps,
+                            channels number is num_classes.
+                          wh_pred (Tensor), wh predicts, the channels number is 2.
+                          offset_pred (Tensor): offset predicts, the channels number is 2.
+                          ltrb_amodal_pred (Tensor): ltrb amodal predicts, the channels number is 4.
+                          tracking_pred (Tensor): tracking predicts, the channels number is 2.
+        """
         center_heatmap_pred = self._smooth_sigmoid(self.heatmap_head(feat))
         wh_pred = self.wh_head(feat)
         offset_pred = self.offset_head(feat)
@@ -85,19 +107,54 @@ class CenterTrackHead(CenterNetHead):
         )
 
     def forward_train(self, x, gt_amodal_bboxes, gt_labels, feat_shape, img_shape, gt_match_indices, ref_bboxes):
+        """
+
+        Args:
+            x (Tensor): Feature from neck. Notice where is a little difference from CenterNeck.
+                We return a Tensor in neck but CenterNeck return a tuple.
+            gt_amodal_bboxes (list[Tensor]): Ground truth bboxes of the image, amodal means the bboxes can be
+                outside of the image, len is batch size, shape (num_gts,4)
+            gt_labels (list[Tensor]): Ground truth labels of each bbox, len is batch size, shape (num_gts,)
+            feat_shape (Torch.Size): feature map size.
+            img_shape (Tuple): input img size.
+            gt_match_indices: (List[Tensor]): len is batch size, shape (num_gts,)
+            ref_bboxes: (list[Tensor]): Ground true bboxes of reference image,
+                len is batch size, shape (num_ref_gts, 4)
+
+        Returns:
+             (dict): the dict has componets below:
+               - loss_center_heatmap
+               - loss_wh
+               - loss_offset
+               - loss_tracking
+               - loss_ltrb_amodal
+        """
         outs = self(x)
         loss = self.loss(outs, gt_amodal_bboxes, gt_labels, feat_shape, img_shape, gt_match_indices, ref_bboxes)
         return loss
 
-    def _build_head(self, in_channel, feat_channel, out_channel):
-        """Build head for each branch."""
-        layer = nn.Sequential(
-            nn.Conv2d(in_channel, feat_channel, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(feat_channel, out_channel, kernel_size=1))
-        return layer
-
     def loss(self, outputs, gt_amodal_bboxes, gt_labels, feat_shape, img_shape, gt_match_indices, ref_bboxes):
+        """Compute losses of the head.
+
+        Args:
+            outputs (dict) : return of self.forward
+            gt_amodal_bboxes (list[Tensor]): Ground truth bboxes for each image with
+                shape (num_gts, 4) in [tl_x, tl_y, br_x, br_y] format.
+            gt_labels (list[Tensor]): class indices corresponding to each box.
+            img_shape (Tuple): input img size.
+            gt_match_indices: (List[Tensor]): len is batch size, shape (num_gts,)
+            gt_match_indices:(List[Tensor]): len is batch size, shape (num_gts,)
+            ref_bboxes: (list[Tensor]): Ground true bboxes of reference image,
+                len is batch size, shape (num_ref_gts, 4)
+
+        Returns:
+            dict[str, Tensor]: which has components below:
+                - loss_center_heatmap (Tensor): loss of center heatmap.
+                - loss_wh (Tensor): loss of hw heatmap
+                - loss_offset (Tensor): loss of offset heatmap.
+                - loss_tracking (Tensor): loss of trakcing.
+                - loss_ltrb_amodal (Tensor): loss of ltrb amodal.
+        """
         targets = self.get_targets(gt_amodal_bboxes, gt_labels, feat_shape, img_shape, gt_match_indices, ref_bboxes)
         outputs = outputs
         # predict
@@ -151,6 +208,32 @@ class CenterTrackHead(CenterNetHead):
             loss_ltrb_amodal=loss_ltrb_amodal)
 
     def get_targets(self, gt_amodal_bboxes, gt_labels, feat_shape, img_shape, gt_match_indices, ref_bboxes):
+        """ Compute regression and classification targets in multiple images.
+            Compared with Centerneck, there are some new targets.
+
+        Args:
+            gt_amodal_bboxes (list[Tensor]): Ground truth bboxes for each image with
+                shape (num_gts, 4) in [tl_x, tl_y, br_x, br_y] format. Amodal means the bboxes can be
+                outside of the image.
+            gt_labels (list[Tensor]): class indices corresponding to each box.
+            feat_shape (list[int]): feature map shape with value [B, _, H, W]
+            img_shape (tuple): image shape in [h, w, c] format.
+            gt_match_indices (list[Tensor]):: bboxes match indices
+            ref_bboxes: (list[Tensor]): Ground true bboxes of reference image,
+                len is batch size, shape (num_ref_gts, 4)
+
+        Returns:
+            (dict): the dict has componets below:
+                -  center_heatmap_target (Tensor): Targets of center heatmap, shape (B, num_classes, H, W).
+                -  wh_target (Tensor): Targets of wh predict, shape (B, 2, H, W).
+                -  wh_offset_target_weight (Tensor): Weights of wh and offset predict, shape (B, 2, H, W).
+                -  offset_target (Tensor): Targets of offset predict, shape (B, 2, H, W).
+                -  ltrb_amodal_target (Tensor): Targets of ltrb amodal predict, shape (B, 4, H, W).
+                -  ltrb_amodal_target_weight (Tensor): Weights of ltrb amodal predict, shape (B, 4, H, W).
+                -  tracking_target (Tensor): Targets of tarcking predict, shape (B, 2, H, W).
+                -  tracking_target_weight (Tensor): Weights of tracking predict, shape (B, 2, H, W).
+                -  avg_factor (float): avarage factor.
+        """
         targets = dict()
 
         img_h, img_w = img_shape[:2]
@@ -248,7 +331,34 @@ class CenterTrackHead(CenterNetHead):
                    ltrb_amodal_preds,
                    img_metas,
                    with_nms=False):
+        """Transform network output for a batch into bbox predictions, center predictions and tracking prediction.
+           Compared with Cent
+        Args:
+            center_heatmap_preds (list[Tensor]): center predict heatmaps for
+                all levels with shape (B, num_classes, H, W).
+            wh_preds (list[Tensor]): wh predicts for all levels with
+                shape (B, 2, H, W).
+            offset_preds (list[Tensor]): offset predicts for all levels
+                with shape (B, 2, H, W).
+            tracking_preds (list[Tensor]): tracking predicts for all levels
+                with shape (B, 2, H, W).
+            ltrb_amodal_preds (list[Tensor]): ltrb amodal predicts for all levels
+                with shape (B, 4, H, W).
+            img_metas (list[dict]): Meta information of each image, e.g.,
+                image size, scaling factor, etc.
+            with_nms (bool): If True, do nms before return boxes.
+                Default: False. Undo
 
+        Returns:
+            list[tuple[Tensor, Tensor, Tensor, Tensor, Tensor]]: The first item is an (n, 5) tensor,
+                where 5 represent (tl_x, tl_y, br_x, br_y, score) and the score between 0 and 1.
+                The shape of the second tensor in the tuple is (n,), and
+                each element represents the class label of the corresponding
+                box.
+                The third item is an (n, 5) tensor and its coordinate are input dimensions.
+                The fourth item is an (n, 2) tensor represents the center of bboxes.
+                The fifth  item is an (n, 2) tensor represents tracking target of bboxes.
+        """
         invert_transfrom = [img_meta['invert_transform_affine'] for img_meta in img_metas]
 
         batch_det_bboxes, batch_labels, batch_centers, tracking_offset = self.decode_heatmap(
@@ -300,6 +410,30 @@ class CenterTrackHead(CenterNetHead):
                        img_shape,
                        k=100,
                        kernel=3):
+        """Transform outputs into detections raw bbox prediction.
+
+        Args:
+            center_heatmap_pred (Tensor): Center predict heatmap,
+               shape (B, num_classes, H, W).
+            wh_pred (Tensor): Wh predict, shape (B, 2, H, W).
+            offset_pred (Tensor): Offset predict, shape (B, 2, H, W).
+            tracking_pred (Tensor): Tracking predict, shape (B, 2, H, W).
+            ltrb_amodal_pred (Tensor): Ltrb amodal predict, shape (B, 2, H, W).
+            img_shape (list[int]): Image shape in [h, w] format.
+            k (int): Get top k center keypoints from heatmap. Default 100.
+            kernel (int): Max pooling kernel for extract local maximum pixels.
+               Default 3.
+
+        Returns:
+            tuple[torch.Tensor]: Decoded output of CenterTrackHead, containing
+               the following Tensors:
+
+              - batch_bboxes (Tensor): Coords of each box with shape (B, k, 5)
+              - batch_topk_labels (Tensor): Categories of each box with \
+                  shape (B, k)
+              - batch_centers (Tensor): Centers of bbox, shape (B,k,2).
+              - tracking_offset (Tensor): tracking offset, use to predict reference bboxes, shape (B,k,2).
+        """
         height, width = center_heatmap_pred.shape[2:]
         inp_h, inp_w = img_shape
 
@@ -334,61 +468,3 @@ class CenterTrackHead(CenterNetHead):
         tracking_offset[:, :, 0] *= inp_w / width
         tracking_offset[:, :, 1] *= inp_h / height
         return batch_bboxes, batch_topk_labels, batch_centers, tracking_offset
-
-    def get_public_bboxes(self,
-                          center_heatmap_pred,
-                          tracking_pred,
-                          public_bboxes,
-                          public_scores,
-                          public_labels,
-                          img_metas,
-                          k=100,
-                          kernel=3):
-        """
-
-        Args:
-            center_heatmap_pred:
-            tracking_pred:
-            public_bboxes: List(Tensor : N,4)
-            public_scores: List(Tensor : 1,N)
-            public_labels: List(Tensor : 1,N)
-            img_metas:
-            k:
-            kernel:
-
-        Returns: det_bboxes
-                 det_labels
-                 det_bboxes_with_motion
-                 det_bboxes_input
-
-        """
-        batch_labels = public_labels[0]
-        batch_det_bboxes_input = torch.cat((public_bboxes[0], public_scores[0].unsqueeze(-1)), -1)
-        batch_det_bboxes = batch_det_bboxes_input.clone()
-        bs = batch_det_bboxes.shape[0]
-        invert_tranform = img_metas[0]['invert_transform_affine']
-        for batch_id in range(bs):
-            batch_det_bboxes[batch_id, :, :2] = self._affine_transform(batch_det_bboxes[batch_id, :, :2],
-                                                                       invert_tranform)
-            batch_det_bboxes[batch_id, :, 2:-1] = self._affine_transform(batch_det_bboxes[batch_id, :, 2:-1],
-                                                                         invert_tranform)
-        height, width = center_heatmap_pred.shape[2:]
-        inp_h, inp_w = img_metas[0]['batch_input_shape']
-
-        center_heatmap_pred = get_local_maximum(
-            center_heatmap_pred, kernel=kernel)
-
-        *batch_dets, _, _ = get_topk_from_heatmap(
-            center_heatmap_pred, k=k)
-        _, batch_index, _ = batch_dets
-        tracking_offset = transpose_and_gather_feat(tracking_pred, batch_index)
-        batch_bboxes_with_motion = batch_det_bboxes.clone()
-        for batch_id in range(bs):
-            batch_bboxes_with_motion[batch_id, :, [0, 2]] += tracking_offset[..., 0] * (inp_w / width)
-            batch_bboxes_with_motion[batch_id, :, [1, 3]] += tracking_offset[..., 1] * (inp_h / height)
-
-        det_results = [
-            tuple(bs) for bs in
-            zip(batch_det_bboxes, batch_labels, batch_bboxes_with_motion, batch_det_bboxes_input)
-        ]
-        return det_results
