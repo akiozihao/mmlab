@@ -155,7 +155,7 @@ lr_config = dict(
 
 # runtime settings
 total_epochs = 70
-evaluation = dict(metric=['bbox', 'track'], interval=1)
+evaluation = dict(metric=['bbox', 'track'], interval=5)
 search_metrics = ['MOTA', 'IDF1', 'FN', 'FP', 'IDs', 'MT', 'ML']
 
 # For distributed training
