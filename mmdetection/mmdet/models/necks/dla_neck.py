@@ -110,7 +110,8 @@ class IDAUp(BaseModule):
 
 
 class DLAUp(BaseModule):
-    """
+    """Upsampling Layer to merge results of DLA backbone
+
     Args:
         startp (int): Layer number to start, which controls how many IDA layers participant in forward.
         channels (list[int]): Number of channels.
