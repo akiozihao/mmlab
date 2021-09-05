@@ -46,7 +46,7 @@ class IDAUp(BaseModule):
                 padding=1,
                 conv_cfg=dict(type='DCNv2') if use_dcn else conv_cfg,
                 norm_cfg=norm_cfg,
-                bias=True
+                bias=False
             )
             node = ConvModule(
                 planes,
@@ -55,7 +55,7 @@ class IDAUp(BaseModule):
                 padding=1,
                 conv_cfg=dict(type='DCNv2') if use_dcn else conv_cfg,
                 norm_cfg=norm_cfg,
-                bias=True
+                bias=False
             )
 
             up = build_conv_layer(
