@@ -7,6 +7,17 @@ from .base_tracker import BaseTracker
 
 @TRACKERS.register_module()
 class CTTracker(BaseTracker):
+    """Tracker for CenterTrack.
+
+    Args:
+        obj_score_thr (float, optional): Threshold to filter the objects.
+            Defaults to 0.4.
+        momentums (dict, optional): momentums in update track.
+            Defaults to None.
+        num_frames_retain (int, optional): If a track is disappeared more than
+            `num_frames_retain` frames, it will be deleted in the memo.
+                Defaults to 3.
+    """
 
     def __init__(self, obj_score_thr=0.4, momentums=None, num_frames_retain=3):
         super(CTTracker, self).__init__(momentums, num_frames_retain)
@@ -14,7 +25,24 @@ class CTTracker(BaseTracker):
 
     def track(self, bboxes_input, bboxes, det_centers, det_tracking_offset,
               labels, frame_id, public_bboxes, public_labels):
-        # public_bboxes = torch.load('/home/akio/Desktop/tp.pth')
+        """Tracking forward function.
+
+        Args:
+            bboxes_input (torch.Tensor): input size bboxes, shape (N, 5).
+            bboxes (torch.Tensor): raw size bboxes, shape (N, 5).
+            det_centers (torch.Tensor): centers of bboxes, shape (N, 2).
+            det_tracking_offset (torch.Tensor): tracking offset of bboxes,
+                shape (N, 2).
+            labels (torch.Tensor): shape (N, ).
+            frame_id (int): The id of current frame, 0-index.
+            public_bboxes (torch.Tensor, optional): Public bounding
+                bboxes from the benchmark. Defaults to None.
+            public_labels (torch.Tensor, optional): Public bounding
+                bboxes labels from the benchmark. Defaults to None.
+
+        Returns:
+            tuple: Tracking results.
+        """
         valid_inds = bboxes[:, -1] > self.obj_score_thr
         bboxes_input = bboxes_input[valid_inds]
         bboxes = bboxes[valid_inds]
@@ -47,7 +75,6 @@ class CTTracker(BaseTracker):
                 (labels.reshape(N, 1) != self.pre_labels.reshape(1, M))) > 0
             dist = dist + invalid * 1e18
             matched_indices = self._greedy_assignment(dist)
-            # pre_ids = self.pre_ids
             ids[matched_indices[:, 0]] = self.pre_ids[matched_indices[:, 1]]
 
             # public detection
@@ -57,8 +84,8 @@ class CTTracker(BaseTracker):
                     2)
                 # Filter out bbox matched with previous frame
                 p_dist[:, matched_indices[:, 0]] += 1e18
-                # p_invalid = p_dist > item_size.reshape(1, N)
-                # p_dist += p_invalid * 1e18
+                p_invalid = p_dist > item_size.reshape(1, N)
+                p_dist += p_invalid * 1e18
                 p_matched_indices = self._greedy_assignment(p_dist)
                 ids[p_matched_indices[:, 1]] = torch.arange(
                     self.num_tracks,
@@ -133,7 +160,7 @@ class CTTracker(BaseTracker):
             return None
         return torch.cat(ids, 0)
 
-    def _xyxy2center(self, bbox):  # shape (N,5)
+    def _xyxy2center(self, bbox):
         ctx = bbox[:, 0] + (bbox[:, 2] - bbox[:, 0]) / 2
         cty = bbox[:, 1] + (bbox[:, 3] - bbox[:, 1]) / 2
         return torch.cat((ctx.reshape(-1, 1), cty.reshape(-1, 1)), 1)
