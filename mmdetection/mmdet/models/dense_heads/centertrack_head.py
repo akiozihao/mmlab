@@ -96,7 +96,6 @@ class CenterTrackHead(CenterNetHead):
         return y
 
     def forward(self, feat):
-        # TODO shape?
         """Forward features.
 
         Args:
@@ -110,13 +109,13 @@ class CenterTrackHead(CenterNetHead):
                 center_heatmap_pred: Heatmap of center predictions,
                     channels number is num_classes.
                 wh_pred: Wh predictions,
-                    the channels number is 2.
+                    shape (B, 2, H, W).
                 offset_pred: Offset predictions,
-                    the channels number is 2.
+                    tshape (B, 2, H, W).
                 ltrb_amodal_pred: Ltrb amodal predictions,
-                    the channels number is 4.
+                    shape (B, 4, H, W).
                 tracking_pred: Tracking predictions,
-                    the channels number is 2.
+                    shape (B, 2, H, W).
         """
         center_heatmap_pred = self._smooth_sigmoid(self.heatmap_head(feat))
         wh_pred = self.wh_head(feat)
@@ -405,8 +404,8 @@ class CenterTrackHead(CenterNetHead):
 
     def get_bboxes(self, center_heatmap_preds, wh_preds, offset_preds,
                    tracking_preds, ltrb_amodal_preds, img_metas):
-        """Transform network output for a batch into bbox, center and
-        tracking prediction.
+        """Transform network output for a batch into bbox, center and tracking
+        prediction.
 
         Args:
             center_heatmap_preds (list[torch.Tensor]): Heatmap of the center
