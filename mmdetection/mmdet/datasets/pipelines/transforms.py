@@ -2593,7 +2593,7 @@ class RandomAffine:
 
 
 @PIPELINES.register_module()
-class RandomCenterAffine(object):
+class RandomCenterAffine():
 
     def __init__(
         self,
@@ -2625,13 +2625,15 @@ class RandomCenterAffine(object):
         img_size = np.array([w, h], np.float32)
         new_h = int(self.crop_size[0])
         new_w = int(self.crop_size[1])
+        try_times = 0
         if center is not None:
             assert ratio is not None
             size_t = img_size * ratio
         else:
+            h_border = self._get_border(self.border, h)
+            w_border = self._get_border(self.border, w)
             while True:
-                h_border = self._get_border(self.border, h)
-                w_border = self._get_border(self.border, w)
+                try_times += 1
                 for i in range(50):
                     ct = img_size / 2
                     if self.ratios is None:
@@ -2675,6 +2677,10 @@ class RandomCenterAffine(object):
                     if any_bbox:
                         center = ct
                         break
+                if try_times > 5:
+                    print('can not find valid bbox in ', results['filename'])
+                    center = img_size / 2
+                    break
                 if center is not None:
                     break
         trans_input = self._get_affine_transform(center, size_t,
