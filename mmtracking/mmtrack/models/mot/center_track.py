@@ -9,15 +9,17 @@ from .base import BaseMultiObjectTracker
 
 @MODELS.register_module()
 class CenterTrack(BaseMultiObjectTracker):
+    """Tracking Objects as Points.
 
-    def __init__(
-            self,
-            detector=None,
-            tracker=None,
-            # pretrains=None,
-            pre_thresh=0.5,
-            use_pre_hm=True,
-            init_cfg=None):
+    Details can be found at 'CenterTrack<https://arxiv.org/abs/2004.01177>'_.
+    """
+
+    def __init__(self,
+                 detector=None,
+                 tracker=None,
+                 pre_thresh=0.5,
+                 use_pre_hm=True,
+                 init_cfg=None):
         super(CenterTrack, self).__init__(init_cfg)
         self.detector = build_detector(detector)
         self.tracker = build_tracker(tracker)
@@ -35,6 +37,21 @@ class CenterTrack(BaseMultiObjectTracker):
                     public_labels=None,
                     public_scores=None,
                     **kwargs):
+        """Test without augmentations.
+
+        Args:
+            img (torch.Tensor): shape (N, C, H, W) enconding input images.
+            img_metas (list[dict]): list of image info
+            public_bboxes (list[torch.Tensor], optional): Public bounding
+                bboxes from the benchmark. Defaults to None.
+            public_labels (list[torch.Tensor], optional): Public bounding
+                bboxes labels from the benchmark. Defaults to None.
+            public_scores (list[torch.Tensor], optional): Public bounding
+                bboxes scores from the benchmark. Defaults to None.
+
+        Returns:
+            dict[str : list(numpy.ndarray)]: The tracking results.
+        """
         frame_id = img_metas[0]['frame_id']
         pre_active_bboxes_input = self.tracker.pre_active_bboxes_input(
             frame_id)
@@ -84,7 +101,7 @@ class CenterTrack(BaseMultiObjectTracker):
             # todo Are outs always tensors?
             *[[tensor] for tensor in outs],
             img_metas=img_metas)
-        # TODO: support batch inference
+        # TODO: support batch inference.
         det_bboxes = result_list[0][0]
         det_labels = result_list[0][1]
         det_bboxes_input = result_list[0][2]
@@ -115,6 +132,11 @@ class CenterTrack(BaseMultiObjectTracker):
                       gt_instance_ids, gt_match_indices, ref_img_metas,
                       ref_img, ref_gt_bboxes, ref_gt_labels,
                       ref_gt_match_indices, ref_gt_instance_ids):
+        """Forward function during training.
+
+        We directly use the forward_train function of ct_detector. Amodal means
+        that the bboxes can be outside of the image.
+        """
         gt_amodal_bboxes = gt_bboxes
         ref_amodal_bboxes = ref_gt_bboxes
         return self.detector.forward_train(
