@@ -32,9 +32,9 @@ def origin_gaussian_radius(det_size, min_overlap=0.7):
 
 @DETECTORS.register_module()
 class CTDetector(SingleStageDetector):
-    """Implementation of CenterTrack (Tracking Objects as Points)
+    """Detector for CenterTrack (Tracking Objects as Points)
 
-    <https://arxiv.org/abs/2004.01177>.
+    Details can be found at 'CenterTrack<https://arxiv.org/abs/2004.01177>'.
     """
 
     def __init__(
@@ -79,11 +79,13 @@ class CTDetector(SingleStageDetector):
         return losses
 
     def _build_ref_hm_update_ref_bboxes(self, ref_img, ref_bboxes):
+        # TODO H, W?
         """Build reference heatmap for backbone and add distortion in bboxes.
 
         Args:
             ref_img (torch.Tensor): Reference images, shape (B, C, H, W).
-            ref_bboxes (torch.Tensor): Ground bboxes for reference images.
+            ref_bboxes (torch.Tensor): Ground truth bboxes for reference
+                images.
 
         Returns:
             tuple: Reference heatmap shape (B, 1, H, W), distorted bboxes.

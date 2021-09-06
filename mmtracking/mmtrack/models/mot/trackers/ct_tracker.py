@@ -7,16 +7,18 @@ from .base_tracker import BaseTracker
 
 @TRACKERS.register_module()
 class CTTracker(BaseTracker):
-    """Tracker for CenterTrack.
+    """Tracker for CenterTrack (Tracking Objects as Points)
+
+    Details can be found at 'CenterTrack<https://arxiv.org/abs/2004.01177>'.
 
     Args:
-        obj_score_thr (float, optional): Threshold to filter the objects.
-            Defaults to 0.4.
+        obj_score_thr (float, optional): Threshold to filter the newly
+            detected objects. Defaults to 0.4.
         momentums (dict, optional): momentums in update track.
             Defaults to None.
         num_frames_retain (int, optional): If a track is disappeared more than
             `num_frames_retain` frames, it will be deleted in the memo.
-                Defaults to 3.
+            Defaults to 3.
     """
 
     def __init__(self, obj_score_thr=0.4, momentums=None, num_frames_retain=3):
@@ -28,17 +30,17 @@ class CTTracker(BaseTracker):
         """Tracking forward function.
 
         Args:
-            bboxes_input (torch.Tensor): input size bboxes, shape (N, 5).
-            bboxes (torch.Tensor): raw size bboxes, shape (N, 5).
-            det_centers (torch.Tensor): centers of bboxes, shape (N, 2).
-            det_tracking_offset (torch.Tensor): tracking offset of bboxes,
+            bboxes_input (torch.Tensor): Input size bboxes, shape (N, 5).
+            bboxes (torch.Tensor): Raw size bboxes, shape (N, 5).
+            det_centers (torch.Tensor): Centers of bboxes, shape (N, 2).
+            det_tracking_offset (torch.Tensor): Tracking offset of bboxes,
                 shape (N, 2).
             labels (torch.Tensor): shape (N, ).
-            frame_id (int): The id of current frame, 0-index.
-            public_bboxes (torch.Tensor, optional): Public bounding
-                bboxes from the benchmark. Defaults to None.
-            public_labels (torch.Tensor, optional): Public bounding
-                bboxes labels from the benchmark. Defaults to None.
+            frame_id (int): The id of current frame, 0-indexed.
+            public_bboxes (torch.Tensor): Public bounding
+                boxes from the benchmark.
+            public_labels (torch.Tensor): Labels of bounding boxes from the
+                benchmark.
 
         Returns:
             tuple: Tracking results.

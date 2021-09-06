@@ -1,3 +1,5 @@
+import typing
+
 import torch
 from mmdet.core import bbox2result
 from mmdet.models import build_detector
@@ -9,9 +11,9 @@ from .base import BaseMultiObjectTracker
 
 @MODELS.register_module()
 class CenterTrack(BaseMultiObjectTracker):
-    """Tracking Objects as Points.
+    """Implementation of CenterTrack (Tracking Objects as Points)
 
-    Details can be found at 'CenterTrack<https://arxiv.org/abs/2004.01177>'_.
+    Details can be found at 'CenterTrack<https://arxiv.org/abs/2004.01177>'.
     """
 
     def __init__(self,
@@ -40,17 +42,17 @@ class CenterTrack(BaseMultiObjectTracker):
         """Test without augmentations.
 
         Args:
-            img (torch.Tensor): shape (N, C, H, W) enconding input images.
-            img_metas (list[dict]): list of image info
+            img (torch.Tensor): shape (N, C, H, W) Encoded input images.
+            img_metas (list[dict]): List of image info.
             public_bboxes (list[torch.Tensor], optional): Public bounding
-                bboxes from the benchmark. Defaults to None.
-            public_labels (list[torch.Tensor], optional): Public bounding
-                bboxes labels from the benchmark. Defaults to None.
-            public_scores (list[torch.Tensor], optional): Public bounding
-                bboxes scores from the benchmark. Defaults to None.
+                boxes from the benchmark. Defaults to None.
+            public_labels (list[torch.Tensor], optional): Labels of public
+                bounding  boxes from the benchmark. Defaults to None.
+            public_scores (list[torch.Tensor], optional): Scores of public
+                bounding boxes from the benchmark. Defaults to None.
 
         Returns:
-            dict[str : list(numpy.ndarray)]: The tracking results.
+            dict[str, list[numpy.ndarray]]: The tracking results.
         """
         frame_id = img_metas[0]['frame_id']
         pre_active_bboxes_input = self.tracker.pre_active_bboxes_input(
