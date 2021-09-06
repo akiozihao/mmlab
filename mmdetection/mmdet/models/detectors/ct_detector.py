@@ -32,6 +32,10 @@ def origin_gaussian_radius(det_size, min_overlap=0.7):
 
 @DETECTORS.register_module()
 class CTDetector(SingleStageDetector):
+    """Implementation of CenterTrack (Tracking Objects as Points)
+
+    <https://arxiv.org/abs/2004.01177>.
+    """
 
     def __init__(
         self,
@@ -62,6 +66,8 @@ class CTDetector(SingleStageDetector):
 
     def forward_train(self, img, img_metas, gt_amodal_bboxes, gt_labels,
                       gt_match_indices, ref_img, ref_amodal_bboxes):
+        """Forward function during training."""
+
         ref_hm, ref_bboxes = self._build_ref_hm_update_ref_bboxes(
             ref_img, ref_amodal_bboxes)
         x = self.backbone(img, ref_img, ref_hm)
@@ -73,6 +79,15 @@ class CTDetector(SingleStageDetector):
         return losses
 
     def _build_ref_hm_update_ref_bboxes(self, ref_img, ref_bboxes):
+        """Build reference heatmap for backbone and add distortion in bboxes.
+
+        Args:
+            ref_img (torch.Tensor): Reference images, shape (B, C, H, W).
+            ref_bboxes (torch.Tensor): Ground bboxes for reference images.
+
+        Returns:
+            tuple: Reference heatmap shape (B, 1, H, W), distorted bboxes.
+        """
         bs, _, img_h, img_w = ref_img.shape
         ref_hm = ref_bboxes[-1].new_zeros([bs, 1, img_h, img_w])
         for batch_id in range(bs):
@@ -125,6 +140,16 @@ class CTDetector(SingleStageDetector):
             return ref_hm, ref_bboxes
 
     def _build_test_hm(self, ref_img, ref_bboxes):
+        """Reference heatmap used in test. Compared with training there is no
+        distortion.
+
+        Args:
+            ref_img (torch.Tensor): Reference images, shape (B, C, H, W).
+            ref_bboxes (torch.Tensor): Ground bboxes for reference images.
+
+        Returns:
+            torch.Tensor: Reference heatmap shape (B, 1, H, W).
+        """
         batch_size, _, img_h, img_w = ref_img.shape
         assert batch_size == 1
         bboxes = ref_bboxes.clone()
