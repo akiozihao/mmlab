@@ -79,7 +79,6 @@ class CTDetector(SingleStageDetector):
         return losses
 
     def _build_ref_hm_update_ref_bboxes(self, ref_img, ref_bboxes):
-        # TODO H, W?
         """Build reference heatmap for backbone and add distortion in bboxes.
 
         Args:
