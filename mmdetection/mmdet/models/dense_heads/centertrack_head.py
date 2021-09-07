@@ -324,9 +324,8 @@ class CenterTrackHead(CenterNetHead):
                 scale_gt_bbox[:, [1, 3]] * height_ratio, 0, feat_h - 1)
             #  clipped scale ref bbox
             scale_ref_bbox = ref_bboxes[batch_id]
-            scale_ref_bbox[:, [0, 2]] = scale_ref_bbox[:, [0, 2]] * width_ratio
-            scale_ref_bbox[:,
-                           [1, 3]] = scale_ref_bbox[:, [1, 3]] * height_ratio
+            scale_ref_bbox[:, [0, 2]] *= width_ratio
+            scale_ref_bbox[:, [1, 3]] *= height_ratio
             # clipped scale gt centers
             scale_gt_centers = (scale_gt_bbox[:, [0, 1]] +
                                 scale_gt_bbox[:, [2, 3]]) / 2
@@ -360,36 +359,26 @@ class CenterTrackHead(CenterNetHead):
                 offset_target[batch_id, 0, cty_int, ctx_int] = ctx - ctx_int
                 offset_target[batch_id, 1, cty_int, ctx_int] = cty - cty_int
 
-                ltrb_amodal_target[batch_id, 0, cty_int,
-                                   ctx_int] = scale_gt_amodal_bbox[j,
-                                                                   0] - ctx_int
-                ltrb_amodal_target[batch_id, 1, cty_int,
-                                   ctx_int] = scale_gt_amodal_bbox[j,
-                                                                   1] - cty_int
-                ltrb_amodal_target[batch_id, 2, cty_int,
-                                   ctx_int] = scale_gt_amodal_bbox[j,
-                                                                   2] - ctx_int
-                ltrb_amodal_target[batch_id, 3, cty_int,
-                                   ctx_int] = scale_gt_amodal_bbox[j,
-                                                                   3] - cty_int
+                scale_gt_amodal_bbox[j, [0, 2]] -= ctx_int
+                scale_gt_amodal_bbox[j, [1, 3]] -= cty_int
+                ltrb_amodal_target[batch_id, :, cty_int, ctx_int] = \
+                    scale_gt_amodal_bbox[j]
                 ltrb_amodal_target_weight[batch_id, :, cty_int, ctx_int] = 1
 
-                if gt_match_indices[batch_id][j] != -1:
-                    idx = gt_match_indices[batch_id][j]
-                    scale_ref_h = scale_ref_bbox[idx][3] - scale_ref_bbox[idx][
-                        1]
-                    scale_ref_w = scale_ref_bbox[idx][2] - scale_ref_bbox[idx][
-                        0]
-                    if scale_ref_h <= 0 or scale_ref_w <= 0:
-                        continue
-                    else:
-                        ref_ctx, ref_cty = scale_ref_centers[idx]
-                        tracking_target[batch_id, 0, cty_int,
-                                        ctx_int] = ref_ctx - ctx_int
-                        tracking_target[batch_id, 1, cty_int,
-                                        ctx_int] = ref_cty - cty_int
-                        tracking_target_weight[batch_id, :, cty_int,
-                                               ctx_int] = 1
+                if gt_match_indices[batch_id][j] == -1:
+                    continue
+                idx = gt_match_indices[batch_id][j]
+                scale_ref_h = scale_ref_bbox[idx][3] - scale_ref_bbox[idx][1]
+                scale_ref_w = scale_ref_bbox[idx][2] - scale_ref_bbox[idx][0]
+                if scale_ref_h <= 0 or scale_ref_w <= 0:
+                    continue
+                else:
+                    ref_ctx, ref_cty = scale_ref_centers[idx]
+                    tracking_target[batch_id, 0, cty_int, ctx_int] = \
+                        ref_ctx - ctx_int
+                    tracking_target[batch_id, 1, cty_int, ctx_int] = \
+                        ref_cty - cty_int
+                    tracking_target_weight[batch_id, :, cty_int, ctx_int] = 1
 
         targets['center_heatmap_target'] = center_heatmap_target
         targets['wh_target'] = wh_target
