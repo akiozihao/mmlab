@@ -195,13 +195,13 @@ class CenterTrackHead(CenterNetHead):
         outputs = outputs
         # predict
         center_heatmap_pred = outputs['center_heatmap_pred']
-        wh_pred = outputs['wh_pred']
+        # wh_pred = outputs['wh_pred']
         offset_pred = outputs['offset_pred']
         ltrb_amodal_pred = outputs['ltrb_amodal_pred']
         tracking_pred = outputs['tracking_pred']
         # target
         center_heatmap_target = targets['center_heatmap_target']
-        wh_target = targets['wh_target']
+        # wh_target = targets['wh_target']
         offset_target = targets['offset_target']
         ltrb_amodal_target = targets['ltrb_amodal_target']
         tracking_target = targets['tracking_target']
@@ -219,11 +219,11 @@ class CenterTrackHead(CenterNetHead):
             offset_target,
             wh_offset_target_weight,
             avg_factor=avg_factor * 2)
-        loss_wh = self.loss_wh(
-            wh_pred,
-            wh_target,
-            wh_offset_target_weight,
-            avg_factor=avg_factor * 2)
+        # loss_wh = self.loss_wh(
+        #     wh_pred,
+        #     wh_target,
+        #     wh_offset_target_weight,
+        #     avg_factor=avg_factor * 2)
         loss_tracking = self.loss_wh(
             tracking_pred,
             tracking_target,
@@ -236,7 +236,7 @@ class CenterTrackHead(CenterNetHead):
             avg_factor=avg_factor * 4)
         return dict(
             loss_center_heatmap=loss_center_heatmap,
-            loss_wh=loss_wh,
+            # loss_wh=loss_wh,
             loss_offset=loss_offset,
             loss_tracking=loss_tracking,
             loss_ltrb_amodal=loss_ltrb_amodal)
