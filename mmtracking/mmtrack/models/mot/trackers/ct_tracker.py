@@ -81,9 +81,10 @@ class CTTracker(BaseTracker):
 
             # public detection
             if public_bboxes is not None:
-                p_dist = torch.cdist(
-                    self._xyxy2center(public_bboxes), det_centers_with_motion,
-                    2)
+                p_dist = torch.pow(
+                    torch.cdist(
+                        self._xyxy2center(public_bboxes),
+                        det_centers_with_motion, 2), 2)
                 # Filter out bbox matched with previous frame
                 p_dist[:, matched_indices[:, 0]] += 1e18
                 p_invalid = p_dist > item_size.reshape(1, N)
