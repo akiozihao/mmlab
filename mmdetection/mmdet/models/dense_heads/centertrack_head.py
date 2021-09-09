@@ -1,3 +1,5 @@
+import math
+
 import torch
 
 from mmdet.models import HEADS, build_loss
@@ -7,6 +9,29 @@ from mmdet.models.utils.gaussian_target import (gaussian_radius,
                                                 get_local_maximum,
                                                 get_topk_from_heatmap,
                                                 transpose_and_gather_feat)
+
+
+def origin_gaussian_radius(det_size, min_overlap=0.7):
+    height, width = det_size
+
+    a1 = 1
+    b1 = (height + width)
+    c1 = width * height * (1 - min_overlap) / (1 + min_overlap)
+    sq1 = math.sqrt(b1**2 - 4 * a1 * c1)
+    r1 = (b1 + sq1) / 2
+
+    a2 = 4
+    b2 = 2 * (height + width)
+    c2 = (1 - min_overlap) * width * height
+    sq2 = math.sqrt(b2**2 - 4 * a2 * c2)
+    r2 = (b2 + sq2) / 2
+
+    a3 = 4 * min_overlap
+    b3 = -2 * min_overlap * (height + width)
+    c3 = (min_overlap - 1) * width * height
+    sq3 = math.sqrt(b3**2 - 4 * a3 * c3)
+    r3 = (b3 + sq3) / 2
+    return min(r1, r2, r3)
 
 
 @HEADS.register_module()
@@ -48,6 +73,7 @@ class CenterTrackHead(CenterNetHead):
                  loss_offset=dict(type='L1Loss', loss_weight=1.0),
                  loss_tracking=dict(type='L1Loss', loss_weight=1.0),
                  loss_ltrb_amodal=dict(type='L1Loss', loss_weight=0.1),
+                 use_origin_gaussian_radius=False,
                  init_cfg=None,
                  train_cfg=None,
                  test_cfg=None):
@@ -74,6 +100,10 @@ class CenterTrackHead(CenterNetHead):
 
         self.loss_tracking = build_loss(loss_tracking)
         self.loss_ltrb_amodal = build_loss(loss_ltrb_amodal)
+
+        self.gaussian_radius = origin_gaussian_radius if \
+            use_origin_gaussian_radius else gaussian_radius
+        self.overlap = 0.7 if use_origin_gaussian_radius else 0.3
 
     def _affine_transform(self, pts, t):
         """Apply affine transform to points.
@@ -341,10 +371,10 @@ class CenterTrackHead(CenterNetHead):
                 scale_box_w = scale_gt_bbox[j][2] - scale_gt_bbox[j][0]
                 if scale_box_h <= 0 or scale_box_w <= 0:
                     continue
-                radius = gaussian_radius(
+                radius = self.gaussian_radius(
                     [torch.ceil(scale_box_h),
                      torch.ceil(scale_box_w)],
-                    min_overlap=0.3)
+                    min_overlap=self.overlap)
                 radius = max(0, int(radius))
 
                 ctx_int, cty_int = ct.int()

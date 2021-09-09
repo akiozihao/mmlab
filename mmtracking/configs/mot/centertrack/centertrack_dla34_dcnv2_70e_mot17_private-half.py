@@ -115,15 +115,16 @@ model = dict(
             type='CenterTrackHead',
             in_channel=64,
             feat_channel=256,
+            use_origin_gaussian_radius=True,
         ),
+        use_origin_gaussian_radius=True,
         test_cfg=dict(topk=100, local_maximum_kernel=3, max_per_img=100),
         train_cfg=dict(fp_disturb=0.1, lost_disturb=0.4, hm_disturb=0.05),
-        use_origin_gaussian_radius=False,
     ),
     tracker=dict(
         type='CTTracker',
         obj_score_thr=0.4,
-        num_frames_retain=3,
+        num_frames_retain=5,
         momentums=dict(
             ids=1,
             bboxes_input=1,
