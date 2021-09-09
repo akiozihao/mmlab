@@ -126,10 +126,11 @@ class CTTracker(BaseTracker):
             return None
         return torch.cat(bboxes, 0)
 
-    def pre_active_bboxes_input(self, frame_id):
+    def pre_active_bboxes_input(self, frame_id, thr=0.5):
         bboxes = []
         for id, track in self.tracks.items():
-            if frame_id - track['frame_ids'] == 1:
+            if frame_id - track['frame_ids'] == 1 and track['bboxes_input'][0][
+                    -1] >= thr:
                 bboxes.append(track['bboxes_input'])
         if len(bboxes) == 0:
             return None
