@@ -7,7 +7,7 @@ img_norm_cfg = dict(
 train_pipeline = [
     dict(type='LoadMultiImagesFromFile', to_float32=True),
     dict(type='SeqLoadAnnotations', with_bbox=True, with_track=True),
-    dict(type='SeqPhotoMetricDistortion', share_params=True),
+    dict(type='SeqPhotoMetricDistortion', share_params=False),
     dict(
         type='SeqRandomCenterAffine',
         crop_size=(512, 512),
@@ -23,7 +23,7 @@ train_pipeline = [
         bbox_clip_border=False),
     dict(type='SeqRandomFlip', share_params=True, flip_ratio=0.5),
     dict(type='SeqNormalize', **img_norm_cfg),
-    dict(type='SeqPad', size_divisor=32),
+    # dict(type='SeqPad', size_divisor=32),
     dict(type='MatchInstances', skip_nomatch=True),
     dict(
         type='VideoCollect',
