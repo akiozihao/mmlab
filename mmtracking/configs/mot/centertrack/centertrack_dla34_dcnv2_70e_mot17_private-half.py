@@ -19,7 +19,7 @@ img_norm_cfg = dict(
 train_pipeline = [
     dict(type='LoadMultiImagesFromFile', to_float32=True),
     dict(type='SeqLoadAnnotations', with_bbox=True, with_track=True),
-    dict(type='SeqPhotoMetricDistortion', share_params=True),
+    dict(type='SeqPhotoMetricDistortion', share_params=False),
     dict(
         type='SeqRandomCenterAffine',
         crop_size=(544, 960),
@@ -32,7 +32,7 @@ train_pipeline = [
         bbox_clip_border=False),
     dict(type='SeqRandomFlip', share_params=True, flip_ratio=0.5),
     dict(type='SeqNormalize', **img_norm_cfg),
-    dict(type='SeqPad', size_divisor=32),
+    # dict(type='SeqPad', size_divisor=32),
     dict(type='MatchInstances', skip_nomatch=True),
     dict(
         type='VideoCollect',
@@ -55,7 +55,7 @@ test_pipeline = [
             dict(type='ImageToTensor', keys=['img']),
             dict(
                 type='VideoCollect',
-                meta_keys=('pad_shape', 'invert_transform_affine'),
+                meta_keys=('invert_transform_affine'),
                 keys=['img'])
         ])
 ]
@@ -115,9 +115,9 @@ model = dict(
             type='CenterTrackHead',
             in_channel=64,
             feat_channel=256,
-            use_origin_gaussian_radius=True,
+            use_origin_gaussian_radius=False,
         ),
-        use_origin_gaussian_radius=True,
+        use_origin_gaussian_radius=False,
         test_cfg=dict(topk=100, local_maximum_kernel=3, max_per_img=100),
         train_cfg=dict(fp_disturb=0.1, lost_disturb=0.4, hm_disturb=0.05),
     ),
