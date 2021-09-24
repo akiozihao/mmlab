@@ -11,6 +11,7 @@
 | CrowdHuman | dla        | O            | M           | M   | O        |     | 56.5, 54.9** | ----, ----  | -            |
 | Halftrain  | original   | M            | M           | O   | O        | 3   | 65.7, 66.2   | ----, ----  | -            |
 | Halftrain  | trained MO | M            | M           | M   | O        |     | 63.2, 65.3   | ----, ----  | -            |
+| Halftrain  | mot17_half | M            | M           | O   | O        | 3   | 65.5, 67.1   | ----, ----  | -            |
 
 
 (*) python test.py tracking --exp_id crowdhuman --pre_hm --test_dataset mot --dataset_version 17halfval --track_thresh 0.6 --resume --ltrb_amodal --input_h 544 --input_w 960
