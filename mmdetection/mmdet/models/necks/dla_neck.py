@@ -2,10 +2,27 @@ import math
 
 import numpy as np
 import torch.nn as nn
+
+from CenterTrack.src.lib.model.networks.DCNv2.dcn_v2 import DCN
 from mmcv.cnn import ConvModule, build_conv_layer
 from mmcv.runner import BaseModule
-
 from mmdet.models.builder import NECKS
+
+
+class DeformConv(nn.Module):
+    def __init__(self, chi, cho):
+        super(DeformConv, self).__init__()
+        self.actf = nn.Sequential(
+            nn.BatchNorm2d(cho, momentum=0.1),
+            nn.ReLU(inplace=True)
+        )
+        self.conv = DCN(chi, cho, kernel_size=(3, 3), stride=1, padding=1,
+                        dilation=1, deformable_groups=1)
+
+    def forward(self, x):
+        x = self.conv(x)
+        x = self.actf(x)
+        return x
 
 
 class IDAUp(BaseModule):
@@ -27,6 +44,7 @@ class IDAUp(BaseModule):
                  planes,
                  channels,
                  up_f,
+                 use_origin_dcn,
                  use_dcn=True,
                  conv_cfg=None,
                  norm_cfg=None,
@@ -37,22 +55,26 @@ class IDAUp(BaseModule):
         for i in range(1, len(channels)):
             c = channels[i]
             f = int(up_f[i])
-            proj = ConvModule(
-                c,
-                planes,
-                3,
-                padding=1,
-                conv_cfg=dict(type='DCNv2') if use_dcn else conv_cfg,
-                norm_cfg=norm_cfg,
-                bias=True)
-            node = ConvModule(
-                planes,
-                planes,
-                3,
-                padding=1,
-                conv_cfg=dict(type='DCNv2') if use_dcn else conv_cfg,
-                norm_cfg=norm_cfg,
-                bias=True)
+            if use_origin_dcn:
+                proj = DeformConv(c, planes)
+                node = DeformConv(planes, planes)
+            else:
+                proj = ConvModule(
+                    c,
+                    planes,
+                    3,
+                    padding=1,
+                    conv_cfg=dict(type='DCNv2') if use_dcn else conv_cfg,
+                    norm_cfg=norm_cfg,
+                    bias=True)
+                node = ConvModule(
+                    planes,
+                    planes,
+                    3,
+                    padding=1,
+                    conv_cfg=dict(type='DCNv2') if use_dcn else conv_cfg,
+                    norm_cfg=norm_cfg,
+                    bias=True)
 
             up = build_conv_layer(
                 dict(type='deconv'),
@@ -126,6 +148,7 @@ class DLAUp(BaseModule):
                  startp,
                  channels,
                  scales,
+                 use_origin_dcn,
                  in_channels=None,
                  use_dcn=True,
                  conv_cfg=None,
@@ -149,7 +172,8 @@ class DLAUp(BaseModule):
                     scales[j:] // scales[j],
                     use_dcn=use_dcn,
                     conv_cfg=conv_cfg,
-                    norm_cfg=norm_cfg))
+                    norm_cfg=norm_cfg,
+                    use_origin_dcn=use_origin_dcn))
             scales[j + 1:] = scales[j]
             in_channels[j + 1:] = [channels[j] for _ in channels[j + 1:]]
 
@@ -183,27 +207,30 @@ class DLANeck(BaseModule):
                  use_dcn=True,
                  conv_cfg=None,
                  norm_cfg=None,
-                 init_cfg=None):
+                 init_cfg=None,
+                 use_origin_dcn=True):
         super(DLANeck, self).__init__(init_cfg)
         self.first_level = int(np.log2(down_ratio))
         self.last_level = 5
-        scales = [2**i for i in range(len(channels[self.first_level:]))]
+        scales = [2 ** i for i in range(len(channels[self.first_level:]))]
         self.dla_up = DLAUp(
             self.first_level,
             channels[self.first_level:],
             scales,
             use_dcn=use_dcn,
             conv_cfg=conv_cfg,
-            norm_cfg=norm_cfg)
+            norm_cfg=norm_cfg,
+            use_origin_dcn=use_origin_dcn)
         out_channel = channels[self.first_level]
 
         self.ida_up = IDAUp(
             out_channel,
             channels[self.first_level:self.last_level],
-            [2**i for i in range(self.last_level - self.first_level)],
+            [2 ** i for i in range(self.last_level - self.first_level)],
             use_dcn=use_dcn,
             conv_cfg=conv_cfg,
-            norm_cfg=norm_cfg)
+            norm_cfg=norm_cfg,
+            use_origin_dcn=use_origin_dcn)
 
     def forward(self, x):
         x = self.dla_up(x)
