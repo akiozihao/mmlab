@@ -29,11 +29,12 @@ def parse_gts(infos):
             visibility = 1.
             iscrowd = 'extra' in gtbox and 'ignore' in gtbox['extra'] and \
                       gtbox['extra']['ignore'] == 1
+            if iscrowd:
+                continue
             ann = dict(
                 category_id=1,
                 bbox=gtbox['fbox'],
                 area=gtbox['fbox'][2] * gtbox['fbox'][3],
-                iscrowd=iscrowd,
                 visibility=visibility,
                 mot_instance_id=ins_id,
                 mot_conf=conf,
