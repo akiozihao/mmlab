@@ -3,6 +3,7 @@
 | Fulltrain  | original   | O            | O           | O   | O        |     | 69.8, 70.2   | 68.1, 66.8  | 67.3         |
 | Fulltrain  | original   | O            | O           | O   | O        | 3   | 67.0, 70.9   | ----, ----  | -            |
 | Halftrain  | original   | O            | O           | O   | O        |     | 64.2, 66.1   | 63.2, 63.1  | -            |
+| Halftrain  | original   | O            | O           | O   | O        | 3   | 65.2, 66.1   | 63.2, 63.1  | -            |
 | crowdhuman | dla        | O            | O           | O   | O        |     | 53.8, 52.2*  | 52.7, 50.7* | -            |
 | Fulltrain  | original   | O            | M           | M   | O        |     | 68.5, 68.2   | 66.2, 65.7  | -            |
 | Fulltrain  | original   | O            | M           | M   | O        | 3   | 67.0, 71.2   | ----, ----  | -            |
