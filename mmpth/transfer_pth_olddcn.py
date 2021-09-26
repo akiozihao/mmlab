@@ -1,7 +1,14 @@
 from collections import OrderedDict
+import argparse
 
 import torch
-
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description='Convert origin checkpoint to mm ')
+    parser.add_argument('-i', '--input', help='path of origin checkpoint')
+    parser.add_argument(
+        '-o', '--output', help='path to save mm checkpoint')
+    return parser.parse_args()
 
 def transfer_pth(source_pth):
     dst_pth_info = dict()
@@ -19,6 +26,7 @@ def transfer_pth(source_pth):
             nk, nv = trans_head(k, v)
         else:
             nk, nv = k, v
+        nk = 'detector.' + nk
         dst_state_dict[nk] = nv
     for k, v in source.items():
         if k == 'state_dict':
@@ -55,10 +63,10 @@ def trans_base(k, v):
 
 def trans_neck(k, v):
     l_k = k.split('.')
-    if l_k[0] == 'dla_up':
-        l_k = trans_dla(k)
-    elif l_k[0] == 'ida_up':
-        l_k = trans_ida(k)
+    # if l_k[0] == 'dla_up':
+    #     l_k = trans_dla(k)
+    # elif l_k[0] == 'ida_up':
+    #     l_k = trans_ida(k)
     l_k.insert(0, 'neck')
     return '.'.join(str(i) for i in l_k), v
 
@@ -79,14 +87,33 @@ def trans_dla(k):
 
 def trans_head(k, v):
     l_k = k.split('.')
+    if l_k[0] == 'hm':
+        l_k[0] = 'heatmap_head'
+    elif l_k[0] == 'reg':
+        l_k[0] = 'offset_head'
+    elif l_k[0] == 'wh':
+        l_k[0] = 'wh_head'
+    elif l_k[0] == 'tracking':
+        l_k[0] = 'tracking_head'
+    elif l_k[0] == 'ltrb_amodal':
+        l_k[0] = 'ltrb_amodal_head'
     l_k.insert(0, 'bbox_head')
     return '.'.join(str(i) for i in l_k), v
 
 
-new_pth_info = transfer_pth(
-    '/home/akio/dev/centertrack_origin/models/mot17_fulltrain.pth')
+# new_pth_info = transfer_pth(
+#     '/home/akio/dev/centertrack_origin/models/mot17_half.pth')
+#
+# for k, v in new_pth_info['state_dict'].items():
+#     print(k, v.shape)
+#
+# torch.save(new_pth_info, '../models/test_mmlab_old_dcn_old_radius_mot17_half'
+#                          '.pth')
 
-for k, v in new_pth_info['state_dict'].items():
-    print(k, v.shape)
+if __name__ == '__main__':
+    args = parse_args()
+    new_pth_info = transfer_pth(args.input)
 
-torch.save(new_pth_info, '../models/new_model_mmdcn.pth')
+    torch.save(new_pth_info,args.output)
+
+    print('done')
