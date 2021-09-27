@@ -21,6 +21,8 @@
 | CrowdHuman | dla        | O            | M           | O   | O        |     | 54.7, 54.3** | ----, ----  | -            |
 | CrowdHuman | dla        | O            | M           | M   | O        |     | 57.1, 50.9   | ----, ----  | -            |
 | CrowdHuman | dla        | O            | M           | M   | O        |     | 54.7, 54.3** | ----, ----  | -            |
+| CrowdHuman | dla        | M            | M           | O   | O        |     | 47.4, 57.4   | ----, ----  | -            |
+| CrowdHuman | dla        | M            | M           | O   | O        |     | 43.0, 50.1** | ----, ----  | -            |
 | Halftrain  | original   | M            | M           | O   | O        | 3   | 65.7, 66.2   | ----, ----  | -            |
 | Halftrain  | trained MO | M            | M           | M   | O        |     | 63.2, 65.3   | ----, ----  | -            |
 
